@@ -14,9 +14,9 @@ vector_store:
   path: ./data/chroma_vector_db
 
 chunker:
-  strategy: fixed-size
-  chunk_size: 500
-  chunk_overlap: 50
+  strategy: semantic
+  threshold: 0.5
+  min_chunk_size: 100
 
 retriever:
   provider: dense
