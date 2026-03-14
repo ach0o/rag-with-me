@@ -16,7 +16,13 @@ class ChromaStore:
     def add(self, chunks: list[Chunk]) -> None:
         self._collection.add(
             documents=[chunk.content for chunk in chunks],
-            metadatas=[chunk.metadata for chunk in chunks],
+            metadatas=[
+                {
+                    "document_id": chunk.document_id,
+                    **chunk.metadata,
+                }
+                for chunk in chunks
+            ],
             embeddings=[chunk.embedding for chunk in chunks],
             ids=[chunk.id for chunk in chunks],
         )
@@ -27,7 +33,7 @@ class ChromaStore:
         for i in range(len(results["ids"][0])):
             chunks.append(
                 Chunk(
-                    document_id=results["metadatas"][0][i]["document_id"],
+                    document_id=results["metadatas"][0][i].get("document_id", ""),
                     content=results["documents"][0][i],
                     metadata=results["metadatas"][0][i],
                     id=results["ids"][0][i],

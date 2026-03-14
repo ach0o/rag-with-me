@@ -1338,6 +1338,7 @@ dependencies = [
     { name = "chromadb" },
     { name = "openai" },
     { name = "pydantic" },
+    { name = "python-dotenv" },
     { name = "pyyaml" },
 ]
 
@@ -1346,6 +1347,7 @@ requires-dist = [
     { name = "chromadb", specifier = ">=1.5.5" },
     { name = "openai", specifier = ">=2.28.0" },
     { name = "pydantic", specifier = ">=2.12.5" },
+    { name = "python-dotenv", specifier = ">=1.2.2" },
     { name = "pyyaml", specifier = ">=6.0.3" },
 ]
 
