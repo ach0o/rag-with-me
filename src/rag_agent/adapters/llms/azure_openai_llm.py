@@ -17,6 +17,7 @@ class AzureOpenAILLM:
         self._model = model
         self._temperature = temperature
         self._max_tokens = max_tokens
+        self.last_usage: dict | None = None
 
     def generate(self, prompt: str) -> str:
         response = self._client.chat.completions.create(
@@ -25,4 +26,10 @@ class AzureOpenAILLM:
             temperature=self._temperature,
             max_completion_tokens=self._max_tokens,
         )
+        self.last_usage = {
+            "model": self._model,
+            "total_tokens": response.usage.total_tokens,
+            "prompt_tokens": response.usage.prompt_tokens,
+            "completion_tokens": response.usage.completion_tokens,
+        }
         return response.choices[0].message.content or ""
