@@ -8,7 +8,10 @@ from rag_agent.adapters.outbound import (
     AzureOpenAIEmbedder,
     AzureOpenAILLM,
     DenseRetriever,
+    BM25SparseRetriever,
     ChromaVectorStore,
+    PostgresDocumentRepository,
+    PostgresChunkRepository,
 )
 from rag_agent.adapters.inbound.cli import parse_args
 from rag_agent.application import IngestUseCase, QueryUseCase
@@ -41,12 +44,19 @@ def cmd_ingest(config: AppConfig) -> None:
         collection_name=config.vector_store.collection_name,
         path=config.vector_store.path,
     )
+    document_repo = None
+    chunk_repo = None
+    if config.database.enabled:
+        document_repo = PostgresDocumentRepository(config.database.url)
+        chunk_repo = PostgresChunkRepository(config.database.url)
 
     use_case = IngestUseCase(
         loader=loader,
         chunker=chunker,
         embedder=embedder,
         vector_store=store,
+        document_repository=document_repo,
+        chunk_repository=chunk_repo,
     )
     chunks = use_case.execute()
     print(f"Ingested {len(chunks)} chunks")
@@ -64,11 +74,18 @@ def cmd_query(config: AppConfig, question: str) -> None:
         collection_name=config.vector_store.collection_name,
         path=config.vector_store.path,
     )
-    retriever = DenseRetriever(
-        embedder=embedder,
-        vector_store=store,
-        top_k=config.retriever.top_k,
-    )
+    if config.retriever.provider == "dense":
+        retriever = DenseRetriever(
+            embedder=embedder,
+            vector_store=store,
+            top_k=config.retriever.top_k,
+        )
+    elif config.retriever.provider == "bm25_sparse":
+        chunk_repo = PostgresChunkRepository(config.database.url)
+        retriever = BM25SparseRetriever(
+            chunk_repository=chunk_repo,
+            top_k=config.retriever.top_k,
+        )
     llm = AzureOpenAILLM(
         model=config.llm.model,
         temperature=config.llm.temperature,

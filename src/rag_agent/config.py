@@ -39,7 +39,7 @@ class ChunkerConfig(BaseModel):
 
 
 class RetrieverConfig(BaseModel):
-    provider: Literal["dense", "sparse", "hybrid"] = "dense"
+    provider: Literal["dense", "bm25_sparse", "hybrid"] = "dense"
     top_k: int = Field(default=5, gt=0)
 
 
@@ -53,6 +53,11 @@ class DataSourceConfig(BaseModel):
     type: Literal["markdown"] = "markdown"
 
 
+class DatabaseConfig(BaseModel):
+    url: str = ""
+    enabled: bool = True
+
+
 class AppConfig(BaseModel):
     llm: LLMConfig = LLMConfig()
     embedder: EmbedderConfig = EmbedderConfig()
@@ -61,6 +66,7 @@ class AppConfig(BaseModel):
     retriever: RetrieverConfig = RetrieverConfig()
     reranker: RerankerConfig = RerankerConfig()
     data_source: DataSourceConfig = DataSourceConfig()
+    database: DatabaseConfig = DatabaseConfig()
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> Self:

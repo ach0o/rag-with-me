@@ -19,7 +19,7 @@ chunker:
   min_chunk_size: 100
 
 retriever:
-  provider: dense
+  provider: bm25_sparse
   top_k: 5
 
 reranker:
@@ -30,3 +30,6 @@ data_source:
   path: ./data/97-things
   type: markdown
 
+database:
+  url: "postgresql://rag:localdev@localhost:5432/rag_agent"
+  enabled: true
