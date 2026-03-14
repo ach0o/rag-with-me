@@ -30,11 +30,13 @@ These are the *slots* the architecture supports. Pick one per slot for Phase 1, 
 | LLM provider | Anthropic (Claude), OpenAI (GPT), Azure OpenAI, Ollama (local) | Azure OpenAI (gpt-5-mini) |
 | Embedder | OpenAI embeddings, Azure OpenAI embeddings, sentence-transformers (local) | Azure OpenAI (text-embedding-3-small) |
 | Vector store | ChromaDB, FAISS, Qdrant | ChromaDB |
+| Document repository | PostgreSQL, SQLite | PostgreSQL (Phase 2) |
+| Chunk repository | PostgreSQL, SQLite | PostgreSQL (Phase 2) |
 | Chunker | Fixed-size, semantic, markdown-header-aware | Fixed-size (simplest baseline) |
 | Retriever | Dense, sparse (BM25), hybrid | Dense (simplest baseline) |
 | Reranker | None, Cohere, cross-encoder | None (add later) |
-| CLI framework | typer, click, argparse | TBD |
-| Domain models | dataclass, Pydantic BaseModel, NamedTuple | TBD |
+| CLI framework | typer, click, argparse | argparse |
+| Domain models | dataclass, Pydantic BaseModel, NamedTuple | dataclass |
 
 ---
 
@@ -42,44 +44,47 @@ These are the *slots* the architecture supports. Pick one per slot for Phase 1, 
 
 **Hexagonal architecture (ports & adapters)** for the overall system. **Pipeline pattern** for the ingestion flow.
 
-### Four Layers
+### Three Layers
 
-**`core/domain/`** — Pure business models and rules. Zero external imports. Contains:
-- Domain models: `Document`, `Chunk`, `QueryResult`
-- Pipeline infrastructure: `Pipeline` class, `PipelineStage` protocol
+**`domain/`** — Pure business models, rules, and port definitions. Zero external imports. Contains:
+- Domain models: `Document`, `Chunk`, `QueryResult` (`domain/models.py`)
+- Pipeline infrastructure: `Pipeline` class, `PipelineStage` protocol (`domain/pipeline.py`)
+- Port definitions: all `Protocol` classes in one file (`domain/ports.py`). Ports define the application's boundary — they belong to the domain, not to adapters.
 
-**`core/use_cases/`** — Application-level orchestration. Each file is one use case. Imports from `core/domain/` and `ports/` only. Contains:
+**`application/`** — Application-level orchestration. Each file is one use case. Imports from `domain/` only. Contains:
 - `IngestUseCase` — assembles and runs the ingestion pipeline
 - `QueryUseCase` — retrieves context, builds prompt, calls LLM
 - `EvaluateUseCase` — runs metrics across configs (Phase 5)
 
-**`ports/`** — Protocol definitions. The contracts adapters must satisfy. Imports from `core/domain/` for type hints only.
+**`adapters/`** — Concrete implementations of ports. Split into:
+- `inbound/` (driver/primary adapters) — things that call into the application (CLI, API)
+- `outbound/` (driven/secondary adapters) — things the application calls out to (databases, APIs, file systems)
 
-**`adapters/`** — Concrete implementations of ports. Imports from `ports/` and external libraries.
-
-**`main.py`** — CLI entry point AND composition root. Reads YAML config, does simple if/elif to pick the right adapter for each port, instantiates, wires into use cases. This is the ONLY place that imports from `adapters/`.
+**`main.py`** — Composition root. Reads YAML config, does simple if/elif to pick the right adapter for each port, instantiates, wires into use cases. This is the ONLY place that imports from `adapters/`.
 
 ### Dependency Rule
 
 ```
-adapters/ → ports/ ← core/use_cases/ → core/domain/
-              ↑
-          main.py (reads config, picks adapters, calls use_cases)
+adapters/outbound/ → domain/ports ← application/ → domain/
+                          ↑
+    main.py (reads config, picks adapters, calls application)
+        ↓
+    adapters/inbound/ (CLI parsing)
 ```
 
-- `core/domain/` imports NOTHING external. Pure Python standard library only.
-- `core/use_cases/` imports from `core/domain/` and `ports/`. Never from `adapters/`.
-- `ports/` imports from `core/domain/` for type hints. Nothing else.
-- `adapters/` imports from `ports/` and external libraries.
+- `domain/` imports NOTHING external. Pure Python standard library only.
+- `application/` imports from `domain/` only. Never from `adapters/`.
+- `adapters/outbound/` imports from `domain/` (models + ports) and external libraries.
+- `adapters/inbound/` handles input parsing (CLI args, HTTP requests).
 - `main.py` is the only place that imports from `adapters/`.
 
-If you see `import chromadb` inside `core/`, that's a bug.
+If you see `import chromadb` inside `domain/` or `application/`, that's a bug.
 
 ### Pipeline Pattern (Ingestion Only)
 
 The ingestion flow is a composable pipeline: `load → chunk → embed → store`.
 
-Both `Pipeline` and `PipelineStage` live in `core/domain/` — they are domain concepts, NOT ports. `PipelineStage` doesn't represent an external system boundary; it's an internal composition mechanism. Ports are strictly for external boundaries (LLM APIs, vector stores, file systems).
+Both `Pipeline` and `PipelineStage` live in `domain/` — they are domain concepts, NOT ports. `PipelineStage` doesn't represent an external system boundary; it's an internal composition mechanism. Ports are strictly for external boundaries (LLM APIs, vector stores, file systems).
 
 The `IngestUseCase` defines stage classes that wrap ports into pipeline stages, assembles the pipeline, and runs it. Stages can be added, removed, or reordered.
 
@@ -100,7 +105,7 @@ The query flow is NOT a pipeline — it has conditional branching (re-query if c
 ## Project Structure
 
 ```
-rag-agent/
+rag-with-me/
 ├── pyproject.toml
 ├── uv.lock
 ├── docker-compose.yml
@@ -111,40 +116,39 @@ rag-agent/
 ├── src/
 │   └── rag_agent/
 │       ├── __init__.py
-│       ├── main.py              # CLI entry point + composition root
+│       ├── __main__.py          # enables `python -m rag_agent`
+│       ├── main.py              # composition root (wires adapters → use cases)
 │       ├── config.py            # Pydantic models, YAML loader
 │       │
-│       ├── core/
-│       │   ├── domain/          # ★ DOMAIN (pure, zero deps)
-│       │   │   ├── __init__.py
-│       │   │   ├── models.py    # Document, Chunk, QueryResult
-│       │   │   └── pipeline.py  # Pipeline, PipelineStage
-│       │   │
-│       │   └── use_cases/       # ★ USE CASES (orchestration)
-│       │       ├── __init__.py
-│       │       ├── ingest.py    # IngestUseCase + stage classes
-│       │       ├── query.py     # QueryUseCase
-│       │       └── evaluate.py  # EvaluateUseCase (Phase 5)
-│       │
-│       ├── ports/               # ★ PORTS (Protocol definitions)
+│       ├── domain/              # ★ DOMAIN (pure, zero deps)
 │       │   ├── __init__.py
-│       │   ├── llm.py
-│       │   ├── embedder.py
-│       │   ├── vector_store.py
-│       │   ├── chunker.py
-│       │   ├── doc_loader.py
-│       │   ├── retriever.py
-│       │   └── reranker.py
+│       │   ├── models.py        # Document, Chunk, QueryResult
+│       │   ├── pipeline.py      # Pipeline, PipelineStage
+│       │   └── ports.py         # ALL port Protocol definitions
+│       │
+│       ├── application/         # ★ APPLICATION (use case orchestration)
+│       │   ├── __init__.py
+│       │   ├── ingest.py        # IngestUseCase + stage classes
+│       │   ├── query.py         # QueryUseCase
+│       │   └── evaluate.py      # EvaluateUseCase (Phase 5)
 │       │
 │       └── adapters/            # ★ ADAPTERS (implementations)
 │           ├── __init__.py
-│           ├── llms/            # one file per provider
-│           ├── embedders/       # one file per provider
-│           ├── vector_stores/   # one file per provider
-│           ├── chunkers/        # one file per strategy
-│           ├── doc_loaders/     # one file per format
-│           ├── retrievers/      # one file per strategy
-│           └── rerankers/       # one file per provider
+│           ├── inbound/         # Driver (primary) adapters
+│           │   ├── __init__.py
+│           │   └── cli.py       # CLI argument parsing
+│           │
+│           └── outbound/        # Driven (secondary) adapters
+│               ├── __init__.py
+│               ├── llms/                # one file per provider
+│               ├── embedders/           # one file per provider
+│               ├── vector_stores/       # one file per provider
+│               ├── document_repos/      # one file per provider (Phase 2)
+│               ├── chunk_repos/         # one file per provider (Phase 2)
+│               ├── chunkers/            # one file per strategy
+│               ├── doc_loaders/         # one file per format
+│               ├── retrievers/          # one file per strategy
+│               └── rerankers/           # one file per provider
 │
 ├── data/
 │   └── 97-things/               # Cloned source repo (gitignored)
@@ -161,7 +165,7 @@ rag-agent/
 
 ## Detailed Specs
 
-### Domain Models (`core/domain/models.py`)
+### Domain Models (`domain/models.py`)
 
 Three domain models. All are plain data containers with no behavior and no external imports. All models have auto-generated UUID `id` fields for persistence and log correlation.
 
@@ -183,11 +187,11 @@ Three domain models. All are plain data containers with no behavior and no exter
 - `chunks: list[Chunk]` — the retrieved context chunks used to generate the answer
 - `metadata: dict` — extensible. Expected keys: `retrieval_time_ms`, `generation_time_ms`, `model` (which LLM answered)
 
-### Pipeline Infrastructure (`core/domain/pipeline.py`)
+### Pipeline Infrastructure (`domain/pipeline.py`)
 
 **`PipelineStage` (Protocol)**
 - Single method: `process(self, data: Any) → Any`
-- Defined HERE in domain, not in `ports/`. This is a domain concept for composing stages, not an external system boundary.
+- Defined HERE in domain. This is a domain concept for composing stages, not an external system boundary.
 - Uses `Any → Any` (see tradeoff #1 above). Each concrete stage class types its own `process()` more specifically.
 
 **`Pipeline`**
@@ -195,44 +199,52 @@ Three domain models. All are plain data containers with no behavior and no exter
 - `add_stage(self, stage: PipelineStage) → Pipeline` — appends a stage, returns self for fluent chaining
 - `run(self, data: Any) → Any` — executes stages in order, passing each stage's output as the next stage's input. First stage receives the initial `data` argument.
 
-### Ports (`ports/`)
+### Ports (`domain/ports.py`)
 
-All ports are Python `Protocol` classes. Adapters satisfy them via structural subtyping — no inheritance required.
+All ports are Python `Protocol` classes in a single file. Ports define the application's boundary — they belong to the domain, not to adapters. Adapters satisfy them via structural subtyping — no inheritance required.
 
-**`DocLoader`** (`ports/doc_loader.py`)
+**`DocLoader`**
 - `load(self) → list[Document]`
 - Loads all documents from the configured data source. Returns domain `Document` objects.
 
-**`Chunker`** (`ports/chunker.py`)
+**`Chunker`**
 - `chunk(self, document: Document) → list[Chunk]`
 - Splits a single document into chunks. Preserves and extends metadata from the parent document.
 
-**`Embedder`** (`ports/embedder.py`)
+**`Embedder`**
 - `embed(self, texts: list[str]) → list[list[float]]`
 - Takes a batch of text strings, returns a list of embedding vectors (same order, same length).
 
-**`VectorStore`** (`ports/vector_store.py`)
+**`VectorStore`**
 - `add(self, chunks: list[Chunk]) → None` — stores chunks with their embeddings and metadata
 - `search(self, embedding: list[float], top_k: int) → list[Chunk]` — finds the top_k most similar chunks to the given embedding vector
 
-**`Retriever`** (`ports/retriever.py`)
+**`DocumentRepository`** (Phase 2)
+- `save(self, documents: list[Document]) → None` — persists raw documents (what was ingested)
+- `get_all(self) → list[Document]` — returns all stored documents (enables re-chunking without re-loading from disk)
+
+**`ChunkRepository`** (Phase 2)
+- `save(self, chunks: list[Chunk]) → None` — persists chunks with content + metadata (what's searchable)
+- `get_all(self) → list[Chunk]` — returns all stored chunks (used by BM25 retriever to build its in-memory index)
+
+**`Retriever`**
 - `retrieve(self, query: str) → list[Chunk]`
 - Takes a natural language query string, returns relevant chunks. No `top_k` parameter — that's in the adapter's constructor via config.
-- NOTE: `DenseRetriever` is a composite adapter. It receives `Embedder` + `VectorStore` in its constructor (wired by `main.py`), embeds the query, then searches. Other retriever strategies (BM25, hybrid) may have different constructor dependencies.
+- NOTE: `DenseRetriever` is a composite adapter. It receives `Embedder` + `VectorStore` in its constructor (wired by `main.py`), embeds the query, then searches. `SparseBM25Retriever` receives `ChunkRepository` to load its corpus. `HybridRetriever` composes dense + sparse with RRF.
 
-**`Reranker`** (`ports/reranker.py`)
+**`Reranker`**
 - `rerank(self, query: str, chunks: list[Chunk]) → list[Chunk]`
 - Takes the query and a list of retrieved chunks, returns a reordered (and possibly truncated) list. The "none" adapter returns chunks unchanged.
 
-**`LLMProvider`** (`ports/llm.py`)
+**`LLMProvider`**
 - `generate(self, prompt: str) → str`
 - Takes a prompt string, returns the generated text. Model selection, temperature, max_tokens are in the adapter's constructor via config.
 
-### Use Cases (`core/use_cases/`)
+### Use Cases (`application/`)
 
 Each use case is a class with an `execute()` method. Constructor receives ports via dependency injection. Use cases never instantiate adapters — they receive already-wired ports.
 
-**`IngestUseCase`** (`core/use_cases/ingest.py`)
+**`IngestUseCase`** (`application/ingest.py`)
 
 This file contains both the use case class and the pipeline stage classes.
 
@@ -243,26 +255,26 @@ Stage classes (each wraps one port into a `PipelineStage`):
 - `StoreStage` — constructor takes `VectorStore`. `process(list[Chunk]) → list[Chunk]`. Calls `add()` to persist, returns the same chunks (passthrough for downstream logging/counting).
 
 `IngestUseCase` class:
-- Constructor takes `DocLoader`, `Chunker`, `Embedder`, `VectorStore`
-- Internally builds a `Pipeline` with the four stages above in order
+- Constructor takes `DocLoader`, `Chunker`, `Embedder`, `VectorStore` (Phase 2 adds `DocumentRepository`, `ChunkRepository`)
+- Internally builds a `Pipeline` with the stages above in order
 - `execute(self) → list[Chunk]` — runs the pipeline with `None` as initial input, returns the stored chunks
 
-**`QueryUseCase`** (`core/use_cases/query.py`)
+**`QueryUseCase`** (`application/query.py`)
 - Constructor takes `Retriever`, `LLMProvider`
 - `execute(self, question: str) → QueryResult`
 - Flow: calls `retriever.retrieve(question)` → assembles a prompt with the retrieved chunks as context → calls `llm.generate(prompt)` → returns a `QueryResult` containing the answer and the chunks used
 - Prompt template: instructs the LLM to answer based on the provided context and say so if the context doesn't contain the answer
 
-**`EvaluateUseCase`** (`core/use_cases/evaluate.py`) — Phase 5, not implemented in Phase 1.
+**`EvaluateUseCase`** (`application/evaluate.py`) — Phase 5, not implemented in Phase 1.
 
-### CLI (`main.py`)
+### CLI (`adapters/inbound/cli.py` + `main.py`)
 
-- Two commands: `ingest` and `query`
-- Both accept `--config` flag (defaults to `config/default.yaml`)
-- `main.py` is also the composition root — it reads config, picks the right adapter for each port via simple if/elif on the config values, instantiates them, and wires them into use cases
-- `ingest`: loads config → builds adapters → creates `IngestUseCase` → calls `execute()` → prints summary (document count, chunk count)
-- `query`: loads config → builds adapters → creates `QueryUseCase` → calls `execute(question)` → prints answer and source citations
-- Adding a new adapter = one new file in `adapters/` + one new elif branch in `main.py`
+- CLI argument parsing lives in `adapters/inbound/cli.py` (an inbound adapter)
+- `main.py` is the composition root — reads config, picks the right adapter for each port via simple if/elif, instantiates, wires into use cases
+- Two commands: `ingest` and `query`, both accept `--config` flag (defaults to `config/default.yaml`)
+- `ingest`: loads config → builds adapters → creates `IngestUseCase` → calls `execute()` → prints summary (chunk count, token usage)
+- `query`: loads config → builds adapters → creates `QueryUseCase` → calls `execute(question)` → prints answer, source citations, and token usage
+- Adding a new adapter = one new file in `adapters/outbound/` + one new elif branch in `main.py`
 
 ### Config (`config.py`)
 
@@ -386,7 +398,26 @@ API keys in `.env` (gitignored), never in YAML. Adapters read `os.environ` direc
 
 ## Docker Compose
 
-Docker from day 1. Contents depend on which vector store you pick — if you choose one that needs a server (e.g., Qdrant), add it here. If you pick an in-process store (e.g., ChromaDB, FAISS), Docker Compose may only hold future services.
+PostgreSQL runs in Docker Compose for persistent document/chunk storage (Phase 2). The repository ports abstract the database — adapters handle the SQL.
+
+```yaml
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: rag_agent
+      POSTGRES_USER: rag
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
+```
+
+Additional services (Qdrant, Redis, etc.) can be added as profiles when needed.
 
 ---
 
@@ -416,20 +447,20 @@ Docker from day 1. Contents depend on which vector store you pick — if you cho
 - **You learn:** uv workflow, hexagonal layout, Docker Compose, config-driven architecture
 
 #### Step 1.2 — Domain Models & Pipeline
-- `core/domain/models.py`: `Document`, `Chunk`, `QueryResult` (see specs above)
-- `core/domain/pipeline.py`: `PipelineStage` protocol, `Pipeline` class (see specs above)
+- `domain/models.py`: `Document`, `Chunk`, `QueryResult` (see specs above)
+- `domain/pipeline.py`: `PipelineStage` protocol, `Pipeline` class (see specs above)
 - **You learn:** pure domain layer with zero deps, Protocol basics
 
 #### Step 1.3 — Ports
-- All 7 port files in `ports/` (see specs above for exact method signatures)
-- Each is a `Protocol` class referencing domain models
+- All port Protocols in `domain/ports.py` (see specs above for exact method signatures)
+- Ports belong to the domain — they define the application's boundary
 - **You learn:** designing minimal interfaces, structural subtyping
 
 #### Step 1.4 — Adapters
-- One adapter per port in `adapters/` — whichever provider you choose
-- Each satisfies its port's Protocol via structural subtyping
+- One adapter per port in `adapters/outbound/` — whichever provider you choose
+- Each satisfies its port's Protocol via structural subtyping (no inheritance)
 - `DenseRetriever` receives `Embedder` + `VectorStore` in constructor
-- **You learn:** wrapping SDKs behind ports, composite adapters
+- **You learn:** wrapping SDKs behind ports, composite adapters, inbound vs outbound
 
 #### Step 1.5 — Use Cases
 - `IngestUseCase` with stage classes + pipeline assembly (see specs above)
@@ -437,18 +468,23 @@ Docker from day 1. Contents depend on which vector store you pick — if you cho
 - **You learn:** use case pattern, pipeline pattern, dependency injection
 
 #### Step 1.6 — CLI & Wiring
-- Wire `main.py` as both CLI and composition root
-- Reads config, if/elif to pick adapters, instantiates, passes to use cases
+- CLI parsing in `adapters/inbound/cli.py`
+- `main.py` as composition root — reads config, if/elif to pick adapters, wires into use cases
 - Two commands: `ingest` and `query`
 - Run 5-10 manual test questions, save baseline notes
-- **You learn:** full end-to-end RAG loop, composition root pattern, where retrieval fails
+- **You learn:** full end-to-end RAG loop, composition root pattern, inbound adapters
 
 ---
 
 ## Phase 2-6 Summary
 
-### Phase 2 — More Adapters & Testing
-- Add 2nd adapter per port
+### Phase 2 — More Adapters, Storage & Testing
+- Add `DocumentRepository` + `ChunkRepository` ports to `domain/ports.py`
+- PostgreSQL adapter for both repositories, Docker Compose setup
+- Update ingestion pipeline: persist documents and chunks to PostgreSQL
+- Add chunker adapters: markdown-header, semantic
+- Add retriever adapters: sparse BM25 (loads corpus from ChunkRepository), hybrid (RRF)
+- Add reranker adapters: Cohere, cross-encoder
 - YAML config swap = different adapter wiring
 - Unit tests with fakes in `tests/fakes/`, integration tests with real adapters
 
@@ -458,10 +494,8 @@ Docker from day 1. Contents depend on which vector store you pick — if you cho
 - Conditional edges: poor context → re-query with rephrased question
 
 ### Phase 4 — Advanced RAG
-- Hybrid retrieval (dense + BM25 with RRF fusion)
-- Reranking layer
-- Markdown-header-aware chunking
 - PDF and DOCX loaders
+- Query expansion and decomposition
 
 ### Phase 5 — Evaluation & Observability
 - Gold-standard Q&A dataset (20-30 pairs)
@@ -481,8 +515,8 @@ Docker from day 1. Contents depend on which vector store you pick — if you cho
 | Phase | Concepts |
 |-------|---------|
 | 1 | RAG fundamentals, hexagonal architecture, pipeline pattern, Python protocols, composition root, embedding + vector store basics |
-| 2 | Adding adapters, config-driven swapping, structural subtyping, unit testing with fakes |
+| 2 | Adding adapters, PostgreSQL repositories, Docker Compose, config-driven swapping, BM25/hybrid retrieval, reranking, unit testing with fakes |
 | 3 | LangGraph state machines, conditional routing, agent loops, conversation memory |
-| 4 | Hybrid search, reciprocal rank fusion, reranking, document parsing |
+| 4 | PDF/DOCX parsing, query expansion, advanced retrieval techniques |
 | 5 | RAG evaluation, metrics design, experiment tracking, observability |
 | 6 | Documentation, demo UI, Docker networking, CI/CD |
