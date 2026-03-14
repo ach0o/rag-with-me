@@ -42,7 +42,7 @@ After showing the list, use `AskUserQuestion`:
 
 ### Step 3: Handle Response
 
-- **confirm**: Read changed files, verify edits are correct. If wrong, point out and back to Step 2. If correct, next batch or summarize.
+- **confirm**: Read changed files, verify edits are correct. If wrong, point out and back to Step 2. If correct, commit changes then continue.
 - **do it**: Spawn an Agent to apply all remaining changes from the list. Exit learner mode.
 - **other**: Answer/adjust. Re-present updated list if changes needed. Back to Step 2.
 

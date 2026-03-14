@@ -27,9 +27,9 @@ These are the *slots* the architecture supports. Pick one per slot for Phase 1, 
 
 | Slot | Options | Phase 1 pick |
 |------|---------|-------------|
-| LLM provider | Anthropic (Claude), OpenAI (GPT), Ollama (local) | TBD |
-| Embedder | OpenAI embeddings, sentence-transformers (local) | TBD |
-| Vector store | ChromaDB, FAISS, Qdrant | TBD |
+| LLM provider | Anthropic (Claude), OpenAI (GPT), Azure OpenAI, Ollama (local) | Azure OpenAI (gpt-5-mini) |
+| Embedder | OpenAI embeddings, Azure OpenAI embeddings, sentence-transformers (local) | Azure OpenAI (text-embedding-3-small) |
+| Vector store | ChromaDB, FAISS, Qdrant | ChromaDB |
 | Chunker | Fixed-size, semantic, markdown-header-aware | Fixed-size (simplest baseline) |
 | Retriever | Dense, sparse (BM25), hybrid | Dense (simplest baseline) |
 | Reranker | None, Cohere, cross-encoder | None (add later) |
@@ -163,18 +163,22 @@ rag-agent/
 
 ### Domain Models (`core/domain/models.py`)
 
-Three domain models. All are plain data containers with no behavior and no external imports.
+Three domain models. All are plain data containers with no behavior and no external imports. All models have auto-generated UUID `id` fields for persistence and log correlation.
 
 **`Document`**
+- `id: str` — auto-generated UUID, used as persistence key and for chunk lineage tracking
 - `content: str` — the raw text content of a loaded file
 - `metadata: dict` — flexible metadata bag. Expected keys: `source` (file path), `title` (extracted from filename or front-matter). Extensible for future formats.
 
 **`Chunk`**
+- `id: str` — auto-generated UUID, used as the key in the vector store
 - `content: str` — the text content of this chunk
+- `document_id: str` — explicit reference to the parent Document's `id` (required, not optional)
 - `metadata: dict` — inherited from parent `Document` plus chunk-specific info. Expected keys: `source`, `title`, `chunk_index` (position in the original document), `start_char` / `end_char` (character offsets). For markdown-header chunking: `headers` (list of parent headers).
 - `embedding: list[float] | None` — populated by the embed stage, `None` before that
 
 **`QueryResult`**
+- `id: str` — auto-generated UUID, used for persistence (query history) and log correlation
 - `answer: str` — the LLM's generated answer
 - `chunks: list[Chunk]` — the retrieved context chunks used to generate the answer
 - `metadata: dict` — extensible. Expected keys: `retrieval_time_ms`, `generation_time_ms`, `model` (which LLM answered)
