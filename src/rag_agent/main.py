@@ -9,6 +9,7 @@ from rag_agent.adapters.outbound import (
     AzureOpenAILLM,
     DenseRetriever,
     BM25SparseRetriever,
+    HybridRetriever,
     ChromaVectorStore,
     PostgresDocumentRepository,
     PostgresChunkRepository,
@@ -84,6 +85,22 @@ def cmd_query(config: AppConfig, question: str) -> None:
         chunk_repo = PostgresChunkRepository(config.database.url)
         retriever = BM25SparseRetriever(
             chunk_repository=chunk_repo,
+            top_k=config.retriever.top_k,
+        )
+    elif config.retriever.provider == "hybrid":
+        chunk_repo = PostgresChunkRepository(config.database.url)
+        dense = DenseRetriever(
+            embedder=embedder,
+            vector_store=store,
+            top_k=config.retriever.top_k,
+        )
+        sparse = BM25SparseRetriever(
+            chunk_repository=chunk_repo,
+            top_k=config.retriever.top_k,
+        )
+        retriever = HybridRetriever(
+            dense_retriever=dense,
+            sparse_retriever=sparse,
             top_k=config.retriever.top_k,
         )
     llm = AzureOpenAILLM(
