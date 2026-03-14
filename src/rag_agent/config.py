@@ -25,9 +25,11 @@ class VectorStoreConfig(BaseModel):
 
 
 class ChunkerConfig(BaseModel):
-    strategy: Literal["fixed-size"] = "fixed-size"
+    strategy: Literal["fixed-size", "markdown-header", "semantic"] = "fixed-size"
     chunk_size: int = Field(default=500, gt=0)
     chunk_overlap: int = Field(default=50, ge=0)
+    threshold: float = Field(default=0.5, ge=0.0, le=1.0)
+    min_chunk_size: int = Field(default=100, gt=0)
 
     @model_validator(mode="after")
     def check_overlap(self) -> Self:

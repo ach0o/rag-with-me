@@ -2,7 +2,11 @@ import argparse
 
 from dotenv import load_dotenv
 
-from rag_agent.adapters.chunkers.fixed_size_chunker import FixedSizeChunker
+from rag_agent.adapters.chunkers import (
+    FixedSizeChunker,
+    MarkdownHeaderChunker,
+    SemanticChunker,
+)
 from rag_agent.adapters.doc_loaders.markdown_loader import MarkdownLoader
 from rag_agent.adapters.embedders.azure_openai_embedder import AzureOpenAIEmbedder
 from rag_agent.adapters.llms.azure_openai_llm import AzureOpenAILLM
@@ -20,11 +24,20 @@ def build_config(config_path: str) -> AppConfig:
 
 def cmd_ingest(config: AppConfig) -> None:
     loader = MarkdownLoader(path=config.data_source.path)
-    chunker = FixedSizeChunker(
-        chunk_size=config.chunker.chunk_size,
-        chunk_overlap=config.chunker.chunk_overlap,
-    )
     embedder = AzureOpenAIEmbedder(model=config.embedder.model)
+    if config.chunker.strategy == "fixed-size":
+        chunker = FixedSizeChunker(
+            chunk_size=config.chunker.chunk_size,
+            chunk_overlap=config.chunker.chunk_overlap,
+        )
+    elif config.chunker.strategy == "markdown-header":
+        chunker = MarkdownHeaderChunker()
+    elif config.chunker.strategy == "semantic":
+        chunker = SemanticChunker(
+            embedder=embedder,
+            threshold=config.chunker.threshold,
+            min_chunk_size=config.chunker.min_chunk_size,
+        )
     store = ChromaStore(
         collection_name=config.vector_store.collection_name,
         path=config.vector_store.path,
