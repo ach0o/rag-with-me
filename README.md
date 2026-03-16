@@ -2,7 +2,7 @@
 
 # RAG Agent on LangGraph
 
-A modular, production-grade RAG (Retrieval-Augmented Generation) agent built with Python. Every component — chunkers, vector stores, embedders, LLMs, retrievers, and rerankers — is behind an abstraction and swappable via YAML configuration.
+A modular, production-grade RAG (Retrieval-Augmented Generation) agent built with Python and LangGraph. Every component — chunkers, vector stores, embedders, LLMs, retrievers, and rerankers — is behind an abstraction and swappable via YAML configuration.
 
 The primary data source is the **97 Things Every Programmer Should Know** collection of markdown files.
 
@@ -18,7 +18,8 @@ src/rag_agent/
 │   └── ports.py      # All port definitions
 ├── application/      # Use case orchestration. Imports domain/ only.
 │   ├── ingest.py     # IngestUseCase + pipeline stages
-│   └── query.py      # QueryUseCase
+│   ├── query.py      # QueryUseCase (simple linear)
+│   └── query_graph.py # QueryGraphBuilder (LangGraph state machine)
 ├── adapters/
 │   ├── inbound/      # CLI argument parsing
 │   └── outbound/     # Concrete implementations of ports
@@ -68,12 +69,17 @@ CLI → DocLoader.load() → [PersistDocuments] → Chunker.chunk()
 
 Persistence stages are optional — enabled when `database.enabled: true`.
 
-### Query
+### Query (LangGraph)
 
 ```
-CLI → Retriever.retrieve(query) → [Reranker.rerank()] → build prompt
-    → LLMProvider.generate(prompt) → QueryResult
+retrieve → grade context →[good]→ generate → done
+                ↓
+              [poor]
+                ↓
+            rephrase query → retrieve (max 2 retries)
 ```
+
+The grader LLM call evaluates if the retrieved context is sufficient. If not, the query is rephrased and retrieval is retried (up to 2 times). A simple linear query path (`QueryUseCase`) is also available as a fallback.
 
 ## Setup
 
@@ -180,18 +186,20 @@ Pydantic validates all config at startup — typos and invalid values are caught
 | Layer | Choice |
 |-------|--------|
 | Language | Python 3.12 |
+| Agent framework | LangGraph |
 | Package manager | uv |
 | Config | YAML + Pydantic |
 | Vector store | ChromaDB |
 | Database | PostgreSQL 16 |
 | LLM / Embedder | Azure OpenAI |
+| Testing | pytest + pytest-cov |
 | Infrastructure | Docker Compose |
 
 ## Roadmap
 
 - [x] Phase 1 — Foundation (end-to-end RAG pipeline)
-- [x] Phase 2 — Multiple adapters, PostgreSQL storage, rerankers
-- [ ] Phase 3 — LangGraph agent (conditional re-query)
+- [x] Phase 2 — Multiple adapters, PostgreSQL storage, rerankers, unit tests
+- [x] Phase 3 — LangGraph agent (grader + rephrase loop)
 - [ ] Phase 4 — PDF/DOCX loaders, query expansion
 - [ ] Phase 5 — Evaluation & observability
 - [ ] Phase 6 — Portfolio polish (demo UI, CI)

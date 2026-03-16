@@ -2,7 +2,7 @@
 
 # RAG Agent on LangGraph
 
-Python으로 만든 모듈형 RAG(Retrieval-Augmented Generation) 에이전트입니다. 청커, 벡터 스토어, 임베더, LLM, 리트리버, 리랭커 등 모든 컴포넌트가 추상화 뒤에 있어서 YAML 설정만 바꾸면 자유롭게 교체할 수 있습니다.
+Python과 LangGraph로 만든 모듈형 RAG(Retrieval-Augmented Generation) 에이전트입니다. 청커, 벡터 스토어, 임베더, LLM, 리트리버, 리랭커 등 모든 컴포넌트가 추상화 뒤에 있어서 YAML 설정만 바꾸면 자유롭게 교체할 수 있습니다.
 
 주요 데이터 소스는 **97 Things Every Programmer Should Know** 마크다운 파일 모음입니다.
 
@@ -18,7 +18,8 @@ src/rag_agent/
 │   └── ports.py      # 모든 포트 정의
 ├── application/      # 유스케이스 오케스트레이션. domain/만 import.
 │   ├── ingest.py     # IngestUseCase + 파이프라인 스테이지
-│   └── query.py      # QueryUseCase
+│   ├── query.py      # QueryUseCase (단순 선형 흐름)
+│   └── query_graph.py # QueryGraphBuilder (LangGraph 상태 머신)
 ├── adapters/
 │   ├── inbound/      # CLI 인자 파싱
 │   └── outbound/     # 포트의 구현체들
@@ -68,12 +69,17 @@ CLI → DocLoader.load() → [문서 저장] → Chunker.chunk()
 
 저장 단계는 선택사항입니다 — `database.enabled: true`일 때만 동작합니다.
 
-### 질의 (Query)
+### 질의 (LangGraph)
 
 ```
-CLI → Retriever.retrieve(query) → [Reranker.rerank()] → 프롬프트 생성
-    → LLMProvider.generate(prompt) → QueryResult
+검색 → 컨텍스트 평가 →[충분]→ 답변 생성 → 완료
+            ↓
+          [부족]
+            ↓
+        질문 재구성 → 검색 (최대 2회 재시도)
 ```
+
+평가 LLM이 검색된 컨텍스트가 질문에 답하기 충분한지 판단합니다. 부족하면 질문을 재구성하고 다시 검색합니다 (최대 2회). 단순 선형 질의 경로(`QueryUseCase`)도 폴백으로 사용 가능합니다.
 
 ## 설치 방법
 
@@ -180,18 +186,20 @@ Pydantic이 시작 시 모든 설정을 검증합니다 — 오타나 잘못된 
 | 레이어 | 선택 |
 |--------|------|
 | 언어 | Python 3.12 |
+| 에이전트 프레임워크 | LangGraph |
 | 패키지 매니저 | uv |
 | 설정 | YAML + Pydantic |
 | 벡터 스토어 | ChromaDB |
 | 데이터베이스 | PostgreSQL 16 |
 | LLM / 임베더 | Azure OpenAI |
+| 테스트 | pytest + pytest-cov |
 | 인프라 | Docker Compose |
 
 ## 로드맵
 
 - [x] Phase 1 — 기반 구축 (엔드투엔드 RAG 파이프라인)
-- [x] Phase 2 — 다양한 어댑터, PostgreSQL 저장소, 리랭커
-- [ ] Phase 3 — LangGraph 에이전트 (조건부 재질의)
+- [x] Phase 2 — 다양한 어댑터, PostgreSQL 저장소, 리랭커, 유닛 테스트
+- [x] Phase 3 — LangGraph 에이전트 (평가 + 재질의 루프)
 - [ ] Phase 4 — PDF/DOCX 로더, 쿼리 확장
 - [ ] Phase 5 — 평가 및 관측성
 - [ ] Phase 6 — 포트폴리오 마무리 (데모 UI, CI)
