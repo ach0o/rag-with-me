@@ -17,7 +17,7 @@ from rag_agent.adapters.outbound import (
     PostgresDocumentRepository,
     SemanticChunker,
 )
-from rag_agent.application import IngestUseCase, QueryUseCase
+from rag_agent.application import IngestUseCase, QueryUseCase, QueryGraphBuilder
 from rag_agent.config import AppConfig
 
 load_dotenv()
@@ -116,7 +116,8 @@ def cmd_query(config: AppConfig, question: str) -> None:
     elif config.reranker.provider == "cross_encoder":
         reranker = CrossEncoderReranker(top_k=config.reranker.top_k)
 
-    use_case = QueryUseCase(retriever=retriever, llm=llm, reranker=reranker)
+    # use_case = QueryUseCase(retriever=retriever, llm=llm, reranker=reranker)
+    use_case = QueryGraphBuilder(retriever=retriever, llm=llm, reranker=reranker)
     result = use_case.execute(question)
 
     print(f"\nAnswer: {result.answer}\n")
@@ -124,6 +125,8 @@ def cmd_query(config: AppConfig, question: str) -> None:
     for chunk in result.chunks:
         source = chunk.metadata.get("source", "unknown")
         print(f"  - {source}")
+    if result.metadata.get("attempts", 0) > 0:
+        print(f"\nRetrieval attempts: {result.metadata['attempts'] + 1}")
 
     print()
     if embedder.last_usage:
