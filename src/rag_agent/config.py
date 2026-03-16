@@ -44,7 +44,7 @@ class RetrieverConfig(BaseModel):
 
 
 class RerankerConfig(BaseModel):
-    provider: Literal["none"] = "none"
+    provider: Literal["none", "cohere", "cross_encoder"] = "none"
     top_k: int = Field(default=3, gt=0)
 
 

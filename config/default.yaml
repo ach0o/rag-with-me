@@ -19,11 +19,11 @@ chunker:
   min_chunk_size: 100
 
 retriever:
-  provider: bm25_sparse
+  provider: hybrid
   top_k: 5
 
 reranker:
-  provider: none
+  provider: cross_encoder
   top_k: 3
 
 data_source:

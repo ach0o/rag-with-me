@@ -1,20 +1,22 @@
 from dotenv import load_dotenv
 
+from rag_agent.adapters.inbound.cli import parse_args
 from rag_agent.adapters.outbound import (
-    FixedSizeChunker,
-    MarkdownHeaderChunker,
-    SemanticChunker,
-    MarkdownDocLoader,
     AzureOpenAIEmbedder,
     AzureOpenAILLM,
-    DenseRetriever,
     BM25SparseRetriever,
-    HybridRetriever,
     ChromaVectorStore,
-    PostgresDocumentRepository,
+    CohereReranker,
+    CrossEncoderReranker,
+    DenseRetriever,
+    FixedSizeChunker,
+    HybridRetriever,
+    MarkdownDocLoader,
+    MarkdownHeaderChunker,
     PostgresChunkRepository,
+    PostgresDocumentRepository,
+    SemanticChunker,
 )
-from rag_agent.adapters.inbound.cli import parse_args
 from rag_agent.application import IngestUseCase, QueryUseCase
 from rag_agent.config import AppConfig
 
@@ -108,8 +110,13 @@ def cmd_query(config: AppConfig, question: str) -> None:
         temperature=config.llm.temperature,
         max_tokens=config.llm.max_tokens,
     )
+    reranker = None
+    if config.reranker.provider == "cohere":
+        reranker = CohereReranker(top_k=config.reranker.top_k)
+    elif config.reranker.provider == "cross_encoder":
+        reranker = CrossEncoderReranker(top_k=config.reranker.top_k)
 
-    use_case = QueryUseCase(retriever=retriever, llm=llm)
+    use_case = QueryUseCase(retriever=retriever, llm=llm, reranker=reranker)
     result = use_case.execute(question)
 
     print(f"\nAnswer: {result.answer}\n")
