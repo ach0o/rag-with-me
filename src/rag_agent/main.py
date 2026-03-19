@@ -13,11 +13,12 @@ from rag_agent.adapters.outbound import (
     HybridRetriever,
     MarkdownDocLoader,
     MarkdownHeaderChunker,
+    PdfDocLoader,
     PostgresChunkRepository,
     PostgresDocumentRepository,
     SemanticChunker,
 )
-from rag_agent.application import IngestUseCase, QueryUseCase, QueryGraphBuilder
+from rag_agent.application import IngestUseCase, QueryGraphBuilder, QueryUseCase
 from rag_agent.config import AppConfig
 
 load_dotenv()
@@ -28,7 +29,11 @@ def build_config(config_path: str) -> AppConfig:
 
 
 def cmd_ingest(config: AppConfig) -> None:
-    loader = MarkdownDocLoader(path=config.data_source.path)
+    if config.data_source.type == "markdown":
+        loader = MarkdownDocLoader(path=config.data_source.path)
+    elif config.data_source.type == "pdf":
+        loader = PdfDocLoader(path=config.data_source.path)
+
     embedder = AzureOpenAIEmbedder(model=config.embedder.model)
     if config.chunker.strategy == "fixed-size":
         chunker = FixedSizeChunker(

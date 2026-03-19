@@ -50,7 +50,7 @@ class RerankerConfig(BaseModel):
 
 class DataSourceConfig(BaseModel):
     path: str = "./data/97-things"
-    type: Literal["markdown"] = "markdown"
+    type: Literal["markdown", "pdf"] = "markdown"
 
 
 class DatabaseConfig(BaseModel):

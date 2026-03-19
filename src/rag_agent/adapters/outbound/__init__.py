@@ -4,7 +4,7 @@ from rag_agent.adapters.outbound.chunkers import (
     MarkdownHeaderChunker,
     SemanticChunker,
 )
-from rag_agent.adapters.outbound.doc_loaders import MarkdownDocLoader
+from rag_agent.adapters.outbound.doc_loaders import MarkdownDocLoader, PdfDocLoader
 from rag_agent.adapters.outbound.document_repos import PostgresDocumentRepository
 from rag_agent.adapters.outbound.embedders import AzureOpenAIEmbedder
 from rag_agent.adapters.outbound.llms import AzureOpenAILLM
@@ -25,6 +25,7 @@ __all__ = [
     "MarkdownHeaderChunker",
     "SemanticChunker",
     "MarkdownDocLoader",
+    "PdfDocLoader",
     "AzureOpenAIEmbedder",
     "AzureOpenAILLM",
     "DenseRetriever",
