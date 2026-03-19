@@ -50,6 +50,7 @@ src/rag_agent/
 | LLM | Azure OpenAI | `llm.provider` |
 | Embedder | Azure OpenAI | `embedder.provider` |
 | Vector store | ChromaDB | `vector_store.provider` |
+| Doc loader | markdown, pdf | `data_source.types` |
 | Chunker | fixed-size, markdown-header, semantic | `chunker.strategy` |
 | Retriever | dense, bm25_sparse, hybrid | `retriever.provider` |
 | Reranker | none, cohere, cross_encoder | `reranker.provider` |
@@ -63,11 +64,11 @@ All swapping is done in `config/default.yaml` — no code changes needed.
 ### Ingestion
 
 ```
-CLI → DocLoader.load() → [PersistDocuments] → Chunker.chunk()
+CLI → DocLoader.load() (per path × type) → [PersistDocuments] → Chunker.chunk()
     → [PersistChunks] → Embedder.embed() → VectorStore.add()
 ```
 
-Persistence stages are optional — enabled when `database.enabled: true`.
+Multiple paths and file types can be ingested in a single run. Persistence stages are optional — enabled when `database.enabled: true`.
 
 ### Query (LangGraph)
 
@@ -174,6 +175,14 @@ reranker:
   provider: cross_encoder   # none | cohere | cross_encoder
   top_k: 3
 
+data_source:
+  paths:
+    - ./data/97-things
+    - ./data/pdfs
+  types:
+    - markdown
+    - pdf
+
 database:
   url: "postgresql://rag:localdev@localhost:5432/rag_agent"
   enabled: true
@@ -200,6 +209,6 @@ Pydantic validates all config at startup — typos and invalid values are caught
 - [x] Phase 1 — Foundation (end-to-end RAG pipeline)
 - [x] Phase 2 — Multiple adapters, PostgreSQL storage, rerankers, unit tests
 - [x] Phase 3 — LangGraph agent (grader + rephrase loop)
-- [ ] Phase 4 — PDF/DOCX loaders, query expansion
+- [ ] Phase 4 — PDF/DOCX loaders, query expansion (PDF loader done, multi-path ingestion done)
 - [ ] Phase 5 — Evaluation & observability
 - [ ] Phase 6 — Portfolio polish (demo UI, CI)

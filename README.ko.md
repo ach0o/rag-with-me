@@ -50,6 +50,7 @@ src/rag_agent/
 | LLM | Azure OpenAI | `llm.provider` |
 | 임베더 | Azure OpenAI | `embedder.provider` |
 | 벡터 스토어 | ChromaDB | `vector_store.provider` |
+| 문서 로더 | markdown, pdf | `data_source.types` |
 | 청커 | fixed-size, markdown-header, semantic | `chunker.strategy` |
 | 리트리버 | dense, bm25_sparse, hybrid | `retriever.provider` |
 | 리랭커 | none, cohere, cross_encoder | `reranker.provider` |
@@ -63,11 +64,11 @@ src/rag_agent/
 ### 수집 (Ingestion)
 
 ```
-CLI → DocLoader.load() → [문서 저장] → Chunker.chunk()
+CLI → DocLoader.load() (경로 × 타입별) → [문서 저장] → Chunker.chunk()
     → [청크 저장] → Embedder.embed() → VectorStore.add()
 ```
 
-저장 단계는 선택사항입니다 — `database.enabled: true`일 때만 동작합니다.
+여러 경로와 파일 타입을 한 번에 수집할 수 있습니다. 저장 단계는 선택사항입니다 — `database.enabled: true`일 때만 동작합니다.
 
 ### 질의 (LangGraph)
 
@@ -200,6 +201,6 @@ Pydantic이 시작 시 모든 설정을 검증합니다 — 오타나 잘못된 
 - [x] Phase 1 — 기반 구축 (엔드투엔드 RAG 파이프라인)
 - [x] Phase 2 — 다양한 어댑터, PostgreSQL 저장소, 리랭커, 유닛 테스트
 - [x] Phase 3 — LangGraph 에이전트 (평가 + 재질의 루프)
-- [ ] Phase 4 — PDF/DOCX 로더, 쿼리 확장
+- [ ] Phase 4 — PDF/DOCX 로더, 쿼리 확장 (PDF 로더 완료, 다중 경로 수집 완료)
 - [ ] Phase 5 — 평가 및 관측성
 - [ ] Phase 6 — 포트폴리오 마무리 (데모 UI, CI)
