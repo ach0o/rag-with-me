@@ -18,45 +18,108 @@ from rag_agent.adapters.outbound import (
     PostgresDocumentRepository,
     SemanticChunker,
 )
-from rag_agent.application import IngestUseCase, QueryGraphBuilder, QueryUseCase
+from rag_agent.application import IngestUseCase, QueryGraphBuilder
 from rag_agent.config import AppConfig
 
 load_dotenv()
 
 
-def build_config(config_path: str) -> AppConfig:
-    return AppConfig.from_yaml(config_path)
-
-
-def cmd_ingest(config: AppConfig) -> None:
+def build_loader(config: AppConfig):
     if config.data_source.type == "markdown":
-        loader = MarkdownDocLoader(path=config.data_source.path)
+        return MarkdownDocLoader(path=config.data_source.path)
     elif config.data_source.type == "pdf":
-        loader = PdfDocLoader(path=config.data_source.path)
+        return PdfDocLoader(path=config.data_source.path)
 
-    embedder = AzureOpenAIEmbedder(model=config.embedder.model)
+
+def build_embedder(config: AppConfig):
+    return AzureOpenAIEmbedder(model=config.embedder.model)
+
+
+def build_chunker(config: AppConfig, embedder):
     if config.chunker.strategy == "fixed-size":
-        chunker = FixedSizeChunker(
+        return FixedSizeChunker(
             chunk_size=config.chunker.chunk_size,
             chunk_overlap=config.chunker.chunk_overlap,
         )
     elif config.chunker.strategy == "markdown-header":
-        chunker = MarkdownHeaderChunker()
+        return MarkdownHeaderChunker()
     elif config.chunker.strategy == "semantic":
-        chunker = SemanticChunker(
+        return SemanticChunker(
             embedder=embedder,
             threshold=config.chunker.threshold,
             min_chunk_size=config.chunker.min_chunk_size,
         )
-    store = ChromaVectorStore(
+
+
+def build_vector_store(config: AppConfig):
+    return ChromaVectorStore(
         collection_name=config.vector_store.collection_name,
         path=config.vector_store.path,
     )
-    document_repo = None
-    chunk_repo = None
-    if config.database.enabled:
-        document_repo = PostgresDocumentRepository(config.database.url)
+
+
+def build_repos(config: AppConfig):
+    if not config.database.enabled:
+        return None, None
+    return (
+        PostgresDocumentRepository(config.database.url),
+        PostgresChunkRepository(config.database.url),
+    )
+
+
+def build_retriever(config: AppConfig, embedder, store):
+    if config.retriever.provider == "dense":
+        return DenseRetriever(
+            embedder=embedder,
+            vector_store=store,
+            top_k=config.retriever.top_k,
+        )
+    elif config.retriever.provider == "bm25_sparse":
         chunk_repo = PostgresChunkRepository(config.database.url)
+        return BM25SparseRetriever(
+            chunk_repository=chunk_repo,
+            top_k=config.retriever.top_k,
+        )
+    elif config.retriever.provider == "hybrid":
+        chunk_repo = PostgresChunkRepository(config.database.url)
+        dense = DenseRetriever(
+            embedder=embedder,
+            vector_store=store,
+            top_k=config.retriever.top_k,
+        )
+        sparse = BM25SparseRetriever(
+            chunk_repository=chunk_repo,
+            top_k=config.retriever.top_k,
+        )
+        return HybridRetriever(
+            dense_retriever=dense,
+            sparse_retriever=sparse,
+            top_k=config.retriever.top_k,
+        )
+
+
+def build_llm(config: AppConfig):
+    return AzureOpenAILLM(
+        model=config.llm.model,
+        temperature=config.llm.temperature,
+        max_tokens=config.llm.max_tokens,
+    )
+
+
+def build_reranker(config: AppConfig):
+    if config.reranker.provider == "cohere":
+        return CohereReranker(top_k=config.reranker.top_k)
+    elif config.reranker.provider == "cross_encoder":
+        return CrossEncoderReranker(top_k=config.reranker.top_k)
+    return None
+
+
+def cmd_ingest(config: AppConfig) -> None:
+    embedder = build_embedder(config)
+    loader = build_loader(config)
+    chunker = build_chunker(config, embedder)
+    store = build_vector_store(config)
+    document_repo, chunk_repo = build_repos(config)
 
     use_case = IngestUseCase(
         loader=loader,
@@ -77,51 +140,12 @@ def cmd_ingest(config: AppConfig) -> None:
 
 
 def cmd_query(config: AppConfig, question: str) -> None:
-    embedder = AzureOpenAIEmbedder(model=config.embedder.model)
-    store = ChromaVectorStore(
-        collection_name=config.vector_store.collection_name,
-        path=config.vector_store.path,
-    )
-    if config.retriever.provider == "dense":
-        retriever = DenseRetriever(
-            embedder=embedder,
-            vector_store=store,
-            top_k=config.retriever.top_k,
-        )
-    elif config.retriever.provider == "bm25_sparse":
-        chunk_repo = PostgresChunkRepository(config.database.url)
-        retriever = BM25SparseRetriever(
-            chunk_repository=chunk_repo,
-            top_k=config.retriever.top_k,
-        )
-    elif config.retriever.provider == "hybrid":
-        chunk_repo = PostgresChunkRepository(config.database.url)
-        dense = DenseRetriever(
-            embedder=embedder,
-            vector_store=store,
-            top_k=config.retriever.top_k,
-        )
-        sparse = BM25SparseRetriever(
-            chunk_repository=chunk_repo,
-            top_k=config.retriever.top_k,
-        )
-        retriever = HybridRetriever(
-            dense_retriever=dense,
-            sparse_retriever=sparse,
-            top_k=config.retriever.top_k,
-        )
-    llm = AzureOpenAILLM(
-        model=config.llm.model,
-        temperature=config.llm.temperature,
-        max_tokens=config.llm.max_tokens,
-    )
-    reranker = None
-    if config.reranker.provider == "cohere":
-        reranker = CohereReranker(top_k=config.reranker.top_k)
-    elif config.reranker.provider == "cross_encoder":
-        reranker = CrossEncoderReranker(top_k=config.reranker.top_k)
+    embedder = build_embedder(config)
+    store = build_vector_store(config)
+    retriever = build_retriever(config, embedder, store)
+    llm = build_llm(config)
+    reranker = build_reranker(config)
 
-    # use_case = QueryUseCase(retriever=retriever, llm=llm, reranker=reranker)
     use_case = QueryGraphBuilder(retriever=retriever, llm=llm, reranker=reranker)
     result = use_case.execute(question)
 
@@ -146,7 +170,7 @@ def cmd_query(config: AppConfig, question: str) -> None:
 
 def main() -> None:
     args = parse_args()
-    config = build_config(args.config)
+    config = AppConfig.from_yaml(args.config)
 
     if args.command == "ingest":
         cmd_ingest(config)
