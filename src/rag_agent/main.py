@@ -24,11 +24,16 @@ from rag_agent.config import AppConfig
 load_dotenv()
 
 
-def build_loader(config: AppConfig):
-    if config.data_source.type == "markdown":
-        return MarkdownDocLoader(path=config.data_source.path)
-    elif config.data_source.type == "pdf":
-        return PdfDocLoader(path=config.data_source.path)
+def build_loaders(config: AppConfig):
+    loader_map = {
+        "markdown": MarkdownDocLoader,
+        "pdf": PdfDocLoader,
+    }
+    return [
+        loader_map[loader](path=path)
+        for path in config.data_source.paths
+        for loader in config.data_source.types
+    ]
 
 
 def build_embedder(config: AppConfig):
@@ -116,13 +121,13 @@ def build_reranker(config: AppConfig):
 
 def cmd_ingest(config: AppConfig) -> None:
     embedder = build_embedder(config)
-    loader = build_loader(config)
+    loaders = build_loaders(config)
     chunker = build_chunker(config, embedder)
     store = build_vector_store(config)
     document_repo, chunk_repo = build_repos(config)
 
     use_case = IngestUseCase(
-        loader=loader,
+        loaders=loaders,
         chunker=chunker,
         embedder=embedder,
         vector_store=store,

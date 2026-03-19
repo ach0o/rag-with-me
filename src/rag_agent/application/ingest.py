@@ -13,11 +13,14 @@ from rag_agent.domain.ports import (
 
 
 class LoadStage:
-    def __init__(self, loader: DocLoader) -> None:
-        self._loader = loader
+    def __init__(self, loaders: list[DocLoader]) -> None:
+        self._loaders = loaders
 
     def process(self, data: Any) -> list[Document]:
-        return self._loader.load()
+        documents: list[Document] = []
+        for loader in self._loaders:
+            documents.extend(loader.load())
+        return documents
 
 
 class ChunkStage:
@@ -80,7 +83,7 @@ class PersistChunkStage:
 class IngestUseCase:
     def __init__(
         self,
-        loader: DocLoader,
+        loaders: list[DocLoader],
         chunker: Chunker,
         embedder: Embedder,
         vector_store: VectorStore,
@@ -88,7 +91,7 @@ class IngestUseCase:
         chunk_repository: ChunkRepository | None = None,
     ) -> None:
         pipeline = Pipeline()
-        pipeline.add_stage(LoadStage(loader))
+        pipeline.add_stage(LoadStage(loaders))
         if document_repository:
             pipeline.add_stage(PersistDocumentStage(document_repository))
         pipeline.add_stage(ChunkStage(chunker))

@@ -25,7 +25,7 @@ class MultiChunkFakeChunker:
 def test_ingest_with_empty_corpus():
     # Given: a loader that returns no documents
     use_case = IngestUseCase(
-        loader=FakeDocLoader([]),
+        loaders=[FakeDocLoader([])],
         chunker=FakeChunker(),
         embedder=FakeEmbedder(),
         vector_store=FakeVectorStore(),
@@ -43,7 +43,7 @@ def test_ingest_flattens_multiple_chunks_per_document():
     docs = [Document(content="Hello world", metadata={"source": "test.md"})]
     store = FakeVectorStore()
     use_case = IngestUseCase(
-        loader=FakeDocLoader(docs),
+        loaders=[FakeDocLoader(docs)],
         chunker=MultiChunkFakeChunker(),
         embedder=FakeEmbedder(),
         vector_store=store,
@@ -62,7 +62,7 @@ def test_ingest_preserves_chunk_document_id():
     # Given: a document with a known id
     doc = Document(content="text", metadata={"source": "a.md"})
     use_case = IngestUseCase(
-        loader=FakeDocLoader([doc]),
+        loaders=[FakeDocLoader([doc])],
         chunker=FakeChunker(),
         embedder=FakeEmbedder(),
         vector_store=FakeVectorStore(),
@@ -73,3 +73,26 @@ def test_ingest_preserves_chunk_document_id():
 
     # Then: each chunk should reference the parent document's id
     assert chunks[0].document_id == doc.id
+
+
+def test_ingest_multiple_loaders():
+    # Given: two loaders each returning different documents
+    docs_a = [Document(content="From loader A", metadata={"source": "a.md"})]
+    docs_b = [Document(content="From loader B", metadata={"source": "b.pdf"})]
+    store = FakeVectorStore()
+    use_case = IngestUseCase(
+        loaders=[FakeDocLoader(docs_a), FakeDocLoader(docs_b)],
+        chunker=FakeChunker(),
+        embedder=FakeEmbedder(),
+        vector_store=store,
+    )
+
+    # When: we execute the pipeline
+    chunks = use_case.execute()
+
+    # Then: documents from both loaders are merged and processed
+    assert len(chunks) == 2
+    assert len(store.chunks) == 2
+    contents = {c.content for c in chunks}
+    assert "From loader A" in contents
+    assert "From loader B" in contents

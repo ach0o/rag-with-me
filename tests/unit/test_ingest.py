@@ -21,7 +21,7 @@ def test_ingest_returns_chunks_with_embeddings():
     # Given: two documents loaded through the full ingestion pipeline
     docs = _make_docs()
     use_case = IngestUseCase(
-        loader=FakeDocLoader(docs),
+        loaders=[FakeDocLoader(docs)],
         chunker=FakeChunker(),
         embedder=FakeEmbedder(),
         vector_store=FakeVectorStore(),
@@ -40,7 +40,7 @@ def test_ingest_stores_chunks_in_vector_store():
     docs = _make_docs()
     store = FakeVectorStore()
     use_case = IngestUseCase(
-        loader=FakeDocLoader(docs),
+        loaders=[FakeDocLoader(docs)],
         chunker=FakeChunker(),
         embedder=FakeEmbedder(),
         vector_store=store,
@@ -59,7 +59,7 @@ def test_ingest_persists_documents_and_chunks():
     doc_repo = FakeDocumentRepository()
     chunk_repo = FakeChunkRepository()
     use_case = IngestUseCase(
-        loader=FakeDocLoader(docs),
+        loaders=[FakeDocLoader(docs)],
         chunker=FakeChunker(),
         embedder=FakeEmbedder(),
         vector_store=FakeVectorStore(),
@@ -79,7 +79,7 @@ def test_ingest_without_repos_skips_persistence():
     # Given: a pipeline with no repositories (database disabled)
     docs = _make_docs()
     use_case = IngestUseCase(
-        loader=FakeDocLoader(docs),
+        loaders=[FakeDocLoader(docs)],
         chunker=FakeChunker(),
         embedder=FakeEmbedder(),
         vector_store=FakeVectorStore(),

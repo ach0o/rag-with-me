@@ -49,8 +49,8 @@ class RerankerConfig(BaseModel):
 
 
 class DataSourceConfig(BaseModel):
-    path: str = "./data/97-things"
-    type: Literal["markdown", "pdf"] = "markdown"
+    paths: list[str] = Field(default=["./data/97-things"])
+    types: list[Literal["markdown", "pdf"]] = Field(default=["markdown"])
 
 
 class DatabaseConfig(BaseModel):
