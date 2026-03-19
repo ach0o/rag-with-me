@@ -28,6 +28,10 @@ class DocLoader(Protocol):
     def load(self) -> list[Document]: ...
 
 
+class ImageDescriber(Protocol):
+    def describe(self, image: bytes) -> str: ...
+
+
 class Chunker(Protocol):
     def chunk(self, document: Document) -> list[Chunk]: ...
 

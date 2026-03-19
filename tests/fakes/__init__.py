@@ -7,6 +7,7 @@ from tests.fakes.fake_retriever import FakeRetriever
 from tests.fakes.fake_reranker import FakeReranker
 from tests.fakes.fake_document_repository import FakeDocumentRepository
 from tests.fakes.fake_chunk_repository import FakeChunkRepository
+from tests.fakes.fake_image_describer import FakeImageDescriber
 
 __all__ = [
     "FakeDocLoader",
@@ -18,4 +19,5 @@ __all__ = [
     "FakeReranker",
     "FakeDocumentRepository",
     "FakeChunkRepository",
+    "FakeImageDescriber",
 ]

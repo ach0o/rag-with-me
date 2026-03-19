@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from rag_agent.adapters.inbound.cli import parse_args
 from rag_agent.adapters.outbound import (
     AzureOpenAIEmbedder,
+    AzureOpenAIImageDescriber,
     AzureOpenAILLM,
     BM25SparseRetriever,
     ChromaVectorStore,
@@ -25,14 +26,17 @@ load_dotenv()
 
 
 def build_loaders(config: AppConfig):
+    image_describer = None
+    if config.image_describer.enabled:
+        image_describer = AzureOpenAIImageDescriber(model=config.image_describer.model)
     loader_map = {
-        "markdown": MarkdownDocLoader,
-        "pdf": PdfDocLoader,
+        "markdown": lambda path: MarkdownDocLoader(path=path),
+        "pdf": lambda path: PdfDocLoader(path=path, image_describer=image_describer),
     }
     return [
-        loader_map[loader](path=path)
+        loader_map[doc_type](path)
         for path in config.data_source.paths
-        for loader in config.data_source.types
+        for doc_type in config.data_source.types
     ]
 
 

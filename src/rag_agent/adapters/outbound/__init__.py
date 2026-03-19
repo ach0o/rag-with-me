@@ -7,6 +7,7 @@ from rag_agent.adapters.outbound.chunkers import (
 from rag_agent.adapters.outbound.doc_loaders import MarkdownDocLoader, PdfDocLoader
 from rag_agent.adapters.outbound.document_repos import PostgresDocumentRepository
 from rag_agent.adapters.outbound.embedders import AzureOpenAIEmbedder
+from rag_agent.adapters.outbound.image_describers import AzureOpenAIImageDescriber
 from rag_agent.adapters.outbound.llms import AzureOpenAILLM
 from rag_agent.adapters.outbound.rerankers import (
     CohereReranker,
@@ -27,6 +28,7 @@ __all__ = [
     "MarkdownDocLoader",
     "PdfDocLoader",
     "AzureOpenAIEmbedder",
+    "AzureOpenAIImageDescriber",
     "AzureOpenAILLM",
     "DenseRetriever",
     "BM25SparseRetriever",

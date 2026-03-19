@@ -29,8 +29,15 @@ reranker:
 data_source:
   paths: 
     - ./data/97-things
+    - ./data/pdfs
   types:
-    - markdown
+    # - markdown
+    - pdf
+
+image_describer:
+  provider: azure-openai
+  model: gpt-5-mini
+  enabled: true
 
 database:
   url: "postgresql://rag:localdev@localhost:5432/rag_agent"

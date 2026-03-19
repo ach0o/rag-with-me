@@ -53,6 +53,12 @@ class DataSourceConfig(BaseModel):
     types: list[Literal["markdown", "pdf"]] = Field(default=["markdown"])
 
 
+class ImageDescriberConfig(BaseModel):
+    provider: Literal["azure-openai"] = "azure-openai"
+    model: str = "gpt-5-mini"
+    enabled: bool = False
+
+
 class DatabaseConfig(BaseModel):
     url: str = ""
     enabled: bool = True
@@ -66,6 +72,7 @@ class AppConfig(BaseModel):
     retriever: RetrieverConfig = RetrieverConfig()
     reranker: RerankerConfig = RerankerConfig()
     data_source: DataSourceConfig = DataSourceConfig()
+    image_describer: ImageDescriberConfig = ImageDescriberConfig()
     database: DatabaseConfig = DatabaseConfig()
 
     @classmethod
