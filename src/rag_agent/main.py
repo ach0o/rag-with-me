@@ -30,11 +30,11 @@ def build_loaders(config: AppConfig):
     if config.image_describer.enabled:
         image_describer = AzureOpenAIImageDescriber(model=config.image_describer.model)
     loader_map = {
-        "markdown": lambda path: MarkdownDocLoader(path=path),
-        "pdf": lambda path: PdfDocLoader(path=path, image_describer=image_describer),
+        "markdown": MarkdownDocLoader,
+        "pdf": PdfDocLoader,
     }
     return [
-        loader_map[doc_type](path)
+        loader_map[doc_type](path=path, image_describer=image_describer)
         for path in config.data_source.paths
         for doc_type in config.data_source.types
     ]
