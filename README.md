@@ -73,14 +73,14 @@ Multiple paths and file types can be ingested in a single run. Persistence stage
 ### Query (LangGraph)
 
 ```
-retrieve → grade context →[good]→ generate → done
-                ↓
-              [poor]
-                ↓
-            rephrase query → retrieve (max 2 retries)
+expand query → retrieve (per sub-query) → dedupe → grade →[good]→ generate → done
+                                                     ↓
+                                                   [poor]
+                                                     ↓
+                                                 rephrase → retrieve (max 2 retries)
 ```
 
-The grader LLM call evaluates if the retrieved context is sufficient. If not, the query is rephrased and retrieval is retried (up to 2 times). A simple linear query path (`QueryUseCase`) is also available as a fallback.
+Complex questions are decomposed into 2-4 sub-queries for broader retrieval coverage. Chunks are deduped and reranked against the original question. The grader evaluates context quality — if poor, the query is rephrased and retrieval retried. A simple linear path (`QueryUseCase`) is also available as a fallback.
 
 ## Setup
 
@@ -209,6 +209,6 @@ Pydantic validates all config at startup — typos and invalid values are caught
 - [x] Phase 1 — Foundation (end-to-end RAG pipeline)
 - [x] Phase 2 — Multiple adapters, PostgreSQL storage, rerankers, unit tests
 - [x] Phase 3 — LangGraph agent (grader + rephrase loop)
-- [ ] Phase 4 — PDF/DOCX loaders, query expansion (PDF loader done, multi-path ingestion done)
+- [x] Phase 4 — PDF loader, vision image description, multi-path ingestion, query expansion
 - [ ] Phase 5 — Evaluation & observability
 - [ ] Phase 6 — Portfolio polish (demo UI, CI)
