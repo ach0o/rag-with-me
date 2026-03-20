@@ -9,12 +9,22 @@ from rag_agent.domain.ports import LLMProvider, Reranker, Retriever
 class QueryState(TypedDict):
     question: str
     original_question: str
+    sub_queries: list[str]
     chunks: list[Chunk]
     answer: str
     context_quality: str  # "good" or "poor"
     attempts: int
     max_attempts: int
 
+
+EXPAND_PROMPT = """Break the following question into 2-4 simpler sub-queries that would help retrieve relevant documents. If the question is already simple, return it as-is.
+
+Question: {question}
+
+Return one sub-query per line, nothing else.
+
+Sub-queries:
+"""
 
 GRADER_PROMPT = """Given the question and retrieved context below, decide if the context is sufficient to answer the question.
 
@@ -58,11 +68,25 @@ class QueryGraphBuilder:
         self._reranker = reranker
         self._max_attempts = max_attempts
 
+    def _expand(self, state: QueryState) -> QueryState:
+        prompt = EXPAND_PROMPT.format(question=state["question"])
+        raw = self._llm.generate(prompt).strip()
+        sub_queries = [line.strip() for line in raw.splitlines() if line.strip()]
+        if not sub_queries:
+            sub_queries = [state["question"]]
+        return {**state, "sub_queries": sub_queries}
+
     def _retrieve(self, state: QueryState) -> QueryState:
-        chunks = self._retriever.retrieve(state["question"])
+        all_chunks: dict[str, Chunk] = {}
+        queries = state["sub_queries"] if state["sub_queries"] else [state["question"]]
+        for query in queries:
+            chunks = self._retriever.retrieve(query)
+            for chunk in chunks:
+                all_chunks[chunk.id] = chunk
+        merged = list(all_chunks.values())
         if self._reranker:
-            chunks = self._reranker.rerank(state["question"], chunks)
-        return {**state, "chunks": chunks}
+            merged = self._reranker.rerank(state["original_question"], merged)
+        return {**state, "chunks": merged}
 
     def _grade(self, state: QueryState) -> QueryState:
         context = "\n\n---\n\n".join(c.content for c in state["chunks"])
@@ -98,12 +122,14 @@ class QueryGraphBuilder:
     def build(self):
         graph = StateGraph(QueryState)
 
+        graph.add_node("expand", self._expand)
         graph.add_node("retrieve", self._retrieve)
         graph.add_node("grade", self._grade)
         graph.add_node("rephrase", self._rephrase)
         graph.add_node("generate", self._generate)
 
-        graph.set_entry_point("retrieve")
+        graph.set_entry_point("expand")
+        graph.add_edge("expand", "retrieve")
         graph.add_edge("retrieve", "grade")
         graph.add_conditional_edges(
             "grade",
@@ -123,6 +149,7 @@ class QueryGraphBuilder:
         initial_state: QueryState = {
             "question": question,
             "original_question": question,
+            "sub_queries": [],
             "chunks": [],
             "answer": "",
             "context_quality": "",

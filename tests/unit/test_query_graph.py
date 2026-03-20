@@ -12,7 +12,7 @@ def _make_chunks() -> list[Chunk]:
 
 class SequenceLLM:
     """LLM that returns different responses in sequence.
-    Useful for testing grader → rephraser → grader → generator flows."""
+    Useful for testing expand → grade → rephrase → grade → generate flows."""
 
     def __init__(self, responses: list[str]) -> None:
         self._responses = list(responses)
@@ -27,9 +27,13 @@ class SequenceLLM:
 
 
 def test_graph_good_context_no_rephrase():
-    # Given: an LLM that grades context as "good" and then generates an answer
+    # Given: an LLM that expands, grades "good", then generates
     chunks = _make_chunks()
-    llm = SequenceLLM(["good", "The answer is 42."])
+    llm = SequenceLLM([
+        "sub query 1",             # expand
+        "good",                    # grade
+        "The answer is 42.",       # generate
+    ])
     builder = QueryGraphBuilder(
         retriever=FakeRetriever(chunks),
         llm=llm,
@@ -46,12 +50,13 @@ def test_graph_good_context_no_rephrase():
 
 
 def test_graph_poor_context_triggers_rephrase():
-    # Given: an LLM that grades "poor" first, then rephrases, then grades "good", then generates
+    # Given: an LLM that expands, grades "poor", rephrases, grades "good", generates
     chunks = _make_chunks()
     llm = SequenceLLM([
-        "poor",                    # 1st grade: poor context
+        "sub query 1",             # expand
+        "poor",                    # 1st grade
         "rephrased question",      # rephrase
-        "good",                    # 2nd grade: good context
+        "good",                    # 2nd grade
         "Better answer now.",      # generate
     ])
     builder = QueryGraphBuilder(
@@ -72,11 +77,12 @@ def test_graph_max_retries_exhausted():
     # Given: an LLM that always grades "poor" — forces max retries
     chunks = _make_chunks()
     llm = SequenceLLM([
+        "sub query 1",             # expand
         "poor",                    # 1st grade
         "rephrased v1",            # 1st rephrase
         "poor",                    # 2nd grade
         "rephrased v2",            # 2nd rephrase
-        "poor",                    # 3rd grade — max_attempts reached, go to generate
+        "poor",                    # 3rd grade — max_attempts reached
         "Forced answer.",          # generate despite poor context
     ])
     builder = QueryGraphBuilder(
@@ -98,7 +104,11 @@ def test_graph_with_reranker():
     # Given: a reranker that reverses chunk order
     chunks = _make_chunks()
     reranker = FakeReranker()
-    llm = SequenceLLM(["good", "Reranked answer."])
+    llm = SequenceLLM([
+        "sub query 1",             # expand
+        "good",                    # grade
+        "Reranked answer.",        # generate
+    ])
     builder = QueryGraphBuilder(
         retriever=FakeRetriever(chunks),
         llm=llm,
@@ -117,7 +127,11 @@ def test_graph_with_reranker():
 def test_graph_unknown_grade_defaults_to_good():
     # Given: an LLM that returns an unexpected grade value
     chunks = _make_chunks()
-    llm = SequenceLLM(["maybe", "Answer anyway."])
+    llm = SequenceLLM([
+        "sub query 1",             # expand
+        "maybe",                   # grade (unknown → defaults to "good")
+        "Answer anyway.",          # generate
+    ])
     builder = QueryGraphBuilder(
         retriever=FakeRetriever(chunks),
         llm=llm,
@@ -134,7 +148,13 @@ def test_graph_unknown_grade_defaults_to_good():
 
 def test_graph_empty_retrieval():
     # Given: a retriever that returns no chunks
-    llm = SequenceLLM(["poor", "rephrased", "poor", "No context available."])
+    llm = SequenceLLM([
+        "sub query 1",             # expand
+        "poor",                    # 1st grade
+        "rephrased",               # rephrase
+        "poor",                    # 2nd grade — max reached
+        "No context available.",   # generate
+    ])
     builder = QueryGraphBuilder(
         retriever=FakeRetriever([]),
         llm=llm,
@@ -150,9 +170,15 @@ def test_graph_empty_retrieval():
 
 
 def test_graph_preserves_original_question():
-    # Given: an LLM that rephrases and then generates
+    # Given: an LLM that expands, rephrases, then generates
     chunks = _make_chunks()
-    llm = SequenceLLM(["poor", "better query", "good", "Final answer."])
+    llm = SequenceLLM([
+        "sub query 1",             # expand
+        "poor",                    # grade
+        "better query",            # rephrase
+        "good",                    # grade
+        "Final answer.",           # generate
+    ])
     builder = QueryGraphBuilder(
         retriever=FakeRetriever(chunks),
         llm=llm,
@@ -164,3 +190,46 @@ def test_graph_preserves_original_question():
     # Then: the generate prompt uses the original question, not the rephrased one
     generate_prompt = llm.prompts[-1]
     assert "original question here" in generate_prompt
+
+
+def test_graph_multi_query_expansion():
+    # Given: an LLM that expands into multiple sub-queries
+    chunk_a = Chunk(id="a", document_id="d1", content="About testing")
+    chunk_b = Chunk(id="b", document_id="d1", content="About deployment")
+    llm = SequenceLLM([
+        "What is unit testing?\nWhat is integration testing?",  # expand into 2 sub-queries
+        "good",                    # grade
+        "Testing involves both.",  # generate
+    ])
+    builder = QueryGraphBuilder(
+        retriever=FakeRetriever([chunk_a, chunk_b]),
+        llm=llm,
+    )
+
+    # When: we execute a query
+    result = builder.execute("Tell me about testing")
+
+    # Then: chunks from both sub-queries are merged (deduped by id)
+    assert result.answer == "Testing involves both."
+    assert len(result.chunks) == 2
+
+
+def test_graph_expand_empty_falls_back_to_original():
+    # Given: an LLM that returns empty expansion
+    chunks = _make_chunks()
+    llm = SequenceLLM([
+        "",                        # expand returns empty
+        "good",                    # grade
+        "Fallback answer.",        # generate
+    ])
+    builder = QueryGraphBuilder(
+        retriever=FakeRetriever(chunks),
+        llm=llm,
+    )
+
+    # When: we execute a query
+    result = builder.execute("simple question")
+
+    # Then: falls back to original question for retrieval
+    assert result.answer == "Fallback answer."
+    assert len(result.chunks) == 2
