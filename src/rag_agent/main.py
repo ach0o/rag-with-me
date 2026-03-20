@@ -1,5 +1,6 @@
-from dotenv import load_dotenv
 from typing import TYPE_CHECKING
+
+from dotenv import load_dotenv
 
 from rag_agent.adapters.inbound.cli import parse_args
 from rag_agent.adapters.outbound import (
@@ -20,11 +21,15 @@ from rag_agent.adapters.outbound import (
     PostgresDocumentRepository,
     SemanticChunker,
 )
-from rag_agent.application import IngestUseCase, QueryGraphBuilder, EvaluateUseCase
+from rag_agent.application import EvaluateUseCase, IngestUseCase, QueryGraphBuilder
+from rag_agent.application.metrics import (
+    FaithfulnessMetric,
+    MRRMetric,
+    PrecisionMetric,
+    RecallMetric,
+    SemanticSimilarityMetric,
+)
 from rag_agent.config import AppConfig
-
-if TYPE_CHECKING:
-    from rag_agent.application import QueryUseCase
 
 load_dotenv()
 
@@ -127,7 +132,7 @@ def build_reranker(config: AppConfig):
     return None
 
 
-def build_query_executor(config: AppConfig) -> QueryUseCase | QueryGraphBuilder:
+def build_query_executor(config: AppConfig) -> QueryGraphBuilder:
     embedder = build_embedder(config)
     store = build_vector_store(config)
     retriever = build_retriever(config, embedder, store)
@@ -177,16 +182,24 @@ def cmd_query(config: AppConfig, question: str) -> None:
 def cmd_evaluate(config: AppConfig, dataset_path: str) -> None:
     query_executor = build_query_executor(config)
     judge_llm = build_llm(config)
+    embedder = build_embedder(config)
+    metrics = [
+        RecallMetric(),
+        PrecisionMetric(),
+        MRRMetric(),
+        FaithfulnessMetric(judge_llm),
+        SemanticSimilarityMetric(embedder),
+    ]
     use_case = EvaluateUseCase(
         query_executor=query_executor,
-        judge_llm=judge_llm,
+        metrics=metrics,
         dataset_path=dataset_path,
     )
     summary = use_case.execute()
 
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"Evaluation Summary ({summary.total_questions} questions)")
-    print(f"{'='*50}")
+    print(f"{'=' * 50}")
     for name, score in summary.scores.items():
         print(f"  {name}: {score:.2f}")
     print()
