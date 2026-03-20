@@ -13,5 +13,10 @@ def parse_args() -> argparse.Namespace:
     query_parser = subparsers.add_parser("query", help="Query the RAG agent")
     query_parser.add_argument("question", help="The question to ask")
 
+    eval_parser = subparsers.add_parser("evaluate", help="Evaluate the RAG agent")
+    eval_parser.add_argument(
+        "--dataset", default="eval_data/gold_qa.json", help="Path to dataset JSON"
+    )
+
     args = parser.parse_args()
     return args

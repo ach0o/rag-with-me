@@ -1,0 +1,102 @@
+[
+  {
+    "question": "What is the Don't Repeat Yourself (DRY) principle and how does it apply to different aspects of software development?",
+    "expected_answer": "The DRY principle, formulated by Andy Hunt and Dave Thomas, states that every piece of knowledge must have a single, unambiguous, authoritative representation within a system. It applies to code (via abstraction and design patterns), processes (via automation of testing and builds), and structure (via database normalization).",
+    "expected_source": "thing_30"
+  },
+  {
+    "question": "Why should coding standards be automated rather than just documented, and how can teams enforce them?",
+    "expected_answer": "Documented coding standards are often abandoned under project pressure because following them manually is boring and tedious. Teams should automate enforcement by making code formatting part of the build process, using static analysis tools to break the build on violations, and automatically checking test coverage thresholds.",
+    "expected_source": "thing_04"
+  },
+  {
+    "question": "Why is it dangerous to use inappropriate or humorous placeholder test data in software projects?",
+    "expected_answer": "Placeholder test data that developers consider private often becomes unexpectedly visible to clients, end users, or the public through screenshots, error dialogs, or leaked source code. Profane or joke content in test data can be embarrassing or damaging to individuals, teams, and companies.",
+    "expected_source": "thing_25"
+  },
+  {
+    "question": "Why should programmers learn more than two programming languages across different paradigms?",
+    "expected_answer": "Programming expertise is directly related to the number of paradigms a programmer is comfortable with. Learning languages from different paradigms (procedural, object-oriented, functional, logic, dataflow) enables cross-fertilization of ideas and idioms, leading to more sophisticated use of any single language.",
+    "expected_source": "thing_44"
+  },
+  {
+    "question": "How can stepping away from the keyboard help solve difficult programming problems?",
+    "expected_answer": "When coding, the logical part of your brain is active and the creative side is shut out. Stepping away from the computer allows the creative side to present solutions, as demonstrated by a programmer who replaced 30+ lines of verbose time-validation code with a single regular expression after the idea came to him away from the keyboard.",
+    "expected_source": "thing_69"
+  },
+  {
+    "question": "What are the two key properties of well-designed software interfaces according to Scott Meyers?",
+    "expected_answer": "Good interfaces should be easy to use correctly and hard to use incorrectly. Easy-to-use interfaces make the correct path the path of least resistance, while hard-to-misuse interfaces anticipate mistakes and make them difficult or impossible to commit. Interfaces exist for the convenience of their users, not their implementers.",
+    "expected_source": "thing_55"
+  },
+  {
+    "question": "How does Plato's concept of simplicity relate to writing beautiful code?",
+    "expected_answer": "Plato stated that beauty of style, harmony, grace, and good rhythm depends on simplicity. In software, simplicity is the foundation of readability, maintainability, and development speed. Beautiful code keeps individual parts simple with single responsibilities, simple methods, and simple relationships between system components.",
+    "expected_source": "thing_05"
+  },
+  {
+    "question": "What key considerations should a programmer keep in mind before refactoring existing code?",
+    "expected_answer": "Before refactoring, take stock of the existing codebase and its tests to understand strengths and weaknesses. Avoid rewriting everything since production code contains battle-hardened fixes. Make many incremental changes rather than one massive change, ensure existing tests pass after each iteration, and don't refactor based solely on personal preferences or new technology.",
+    "expected_source": "thing_06"
+  },
+  {
+    "question": "What tools and strategies should developers use to choose wisely when selecting third-party components and frameworks?",
+    "expected_answer": "Start small using only absolutely necessary tools, and be mindful of architectural mismatches, lifecycle conflicts, configuration complexity, vendor lock-in, and licensing terms. Isolate external tools from business domain objects using interfaces and layering so tools can be changed with minimal pain.",
+    "expected_source": "thing_10"
+  },
+  {
+    "question": "How can writing small functions with domain-specific types help prove correctness using examples?",
+    "expected_answer": "By constraining function inputs to domain-specific types rather than generic native types, the mathematical size of the function shrinks dramatically. For example, using a LibertyCount type of {1,2,3,4} instead of int reduces the function's domain from billions of possible values to just four, making it feasible to verify correctness with a small number of test examples.",
+    "expected_source": "thing_94"
+  },
+  {
+    "question": "What are practical ways for software developers to pursue continuous learning and stay marketable?",
+    "expected_answer": "Developers should read books, blogs, and feeds; write hands-on code; work with mentors (real or virtual); study frameworks and libraries they use; teach or speak about topics; join study groups and user groups; attend conferences; listen to podcasts; learn a new language yearly; and learn the business domain they work in.",
+    "expected_source": "thing_18"
+  },
+  {
+    "question": "What are the three essential elements of a good bug report and how should bug trackers be used effectively?",
+    "expected_answer": "A good bug report needs three things: how to reproduce the bug precisely, what should have happened, and what actually happened. Bug tracker users should treat bugs as conversations, explain status changes, avoid overloading fields for personal purposes, and ensure the team shares a common public query for tracking work.",
+    "expected_source": "thing_24"
+  },
+  {
+    "question": "What is the primary cause of poor application response time in modern multi-tier enterprise applications?",
+    "expected_answer": "The number of remote inter-process communications (IPCs) per stimulus usually dominates response time in modern enterprise applications, not data structures or algorithms. Strategies to improve response time include applying parsimony to minimize interactions, parallelizing IPCs, and caching results of previous IPCs.",
+    "expected_source": "thing_38"
+  },
+  {
+    "question": "How does writing code as if you had to support it for the rest of your life improve code quality?",
+    "expected_answer": "Adopting the mindset that you must support your code forever naturally drives you to choose better names, write shorter functions, use design patterns, add comments, write tests, and refactor continually. The code you write forms a trail of your professionalism that influences your career, as people form opinions about you based on the code they see.",
+    "expected_source": "thing_41"
+  },
+  {
+    "question": "Why do interim software solutions tend to persist permanently in systems?",
+    "expected_answer": "Interim solutions acquire inertia because they are useful and widely accepted. Since they work and solve an actual problem, stakeholders always find higher-priority tasks than properly integrating them. The best way to overcome an interim solution is to make it superfluous by providing a more elegant and useful replacement.",
+    "expected_source": "thing_93"
+  },
+  {
+    "question": "What is the semi-formal approach to reasoning about code correctness described by Yechiel Kimchi?",
+    "expected_answer": "The approach involves dividing code into short sections (up to ten lines) and arguing about their correctness convincingly enough for a peer programmer. Key practices include avoiding goto and global variables, minimizing variable scope, making objects immutable, keeping functions short with few parameters, and maintaining narrow interfaces with proper encapsulation.",
+    "expected_source": "thing_15"
+  },
+  {
+    "question": "Why can extracting shared code libraries from unrelated parts of a system be harmful?",
+    "expected_answer": "When two different parts of a system happen to contain similar logic, that similarity may be coincidental rather than meaningful. Extracting shared libraries creates dependencies between previously independent modules, preventing them from evolving independently and increasing maintenance costs and testing burden significantly.",
+    "expected_source": "thing_07"
+  },
+  {
+    "question": "Why should large interconnected persistent data be stored in a relational database rather than handled in application code?",
+    "expected_answer": "Relational databases provide indexed tables that outperform in-memory collections when data exceeds RAM, offer declarative consistency constraints to prevent dangling references, allow efficient querying with SQL, support concurrent multi-application access, and automatically optimize queries including leveraging multicore processors.",
+    "expected_source": "thing_48"
+  },
+  {
+    "question": "Why should programmers always know what their next commit will contain and when it will happen?",
+    "expected_answer": "Programmers who define small, clear tasks achievable in a couple of hours write focused, purposeful code. Those who work on vague, large tasks without a clear commit target end up doing speculative programming, producing poorly matched code. If a task takes too long, it's better to throw away changes and redefine smaller tasks using the insights gained.",
+    "expected_source": "thing_47"
+  },
+  {
+    "question": "Why should programmers not be afraid to break things when refactoring a poorly factored codebase?",
+    "expected_answer": "A paralyzing fear of change is what causes codebases to deteriorate in the first place. Like a skilled surgeon who knows cuts are temporary and necessary, developers should invest time in refactoring by redefining interfaces, restructuring modules, and simplifying designs incrementally while testing along the way, as the long-term benefits outweigh the short-term disruption.",
+    "expected_source": "thing_54"
+  }
+]

@@ -1,4 +1,5 @@
 from dotenv import load_dotenv
+from typing import TYPE_CHECKING
 
 from rag_agent.adapters.inbound.cli import parse_args
 from rag_agent.adapters.outbound import (
@@ -19,8 +20,11 @@ from rag_agent.adapters.outbound import (
     PostgresDocumentRepository,
     SemanticChunker,
 )
-from rag_agent.application import IngestUseCase, QueryGraphBuilder
+from rag_agent.application import IngestUseCase, QueryGraphBuilder, EvaluateUseCase
 from rag_agent.config import AppConfig
+
+if TYPE_CHECKING:
+    from rag_agent.application import QueryUseCase
 
 load_dotenv()
 
@@ -123,6 +127,15 @@ def build_reranker(config: AppConfig):
     return None
 
 
+def build_query_executor(config: AppConfig) -> QueryUseCase | QueryGraphBuilder:
+    embedder = build_embedder(config)
+    store = build_vector_store(config)
+    retriever = build_retriever(config, embedder, store)
+    llm = build_llm(config)
+    reranker = build_reranker(config)
+    return QueryGraphBuilder(retriever=retriever, llm=llm, reranker=reranker)
+
+
 def cmd_ingest(config: AppConfig) -> None:
     embedder = build_embedder(config)
     loaders = build_loaders(config)
@@ -149,13 +162,7 @@ def cmd_ingest(config: AppConfig) -> None:
 
 
 def cmd_query(config: AppConfig, question: str) -> None:
-    embedder = build_embedder(config)
-    store = build_vector_store(config)
-    retriever = build_retriever(config, embedder, store)
-    llm = build_llm(config)
-    reranker = build_reranker(config)
-
-    use_case = QueryGraphBuilder(retriever=retriever, llm=llm, reranker=reranker)
+    use_case = build_query_executor(config)
     result = use_case.execute(question)
 
     print(f"\nAnswer: {result.answer}\n")
@@ -166,15 +173,23 @@ def cmd_query(config: AppConfig, question: str) -> None:
     if result.metadata.get("attempts", 0) > 0:
         print(f"\nRetrieval attempts: {result.metadata['attempts'] + 1}")
 
+
+def cmd_evaluate(config: AppConfig, dataset_path: str) -> None:
+    query_executor = build_query_executor(config)
+    judge_llm = build_llm(config)
+    use_case = EvaluateUseCase(
+        query_executor=query_executor,
+        judge_llm=judge_llm,
+        dataset_path=dataset_path,
+    )
+    summary = use_case.execute()
+
+    print(f"\n{'='*50}")
+    print(f"Evaluation Summary ({summary.total_questions} questions)")
+    print(f"{'='*50}")
+    for name, score in summary.scores.items():
+        print(f"  {name}: {score:.2f}")
     print()
-    if embedder.last_usage:
-        usage = embedder.last_usage
-        print(f"Embed: {usage['total_tokens']} tokens")
-    if llm.last_usage:
-        usage = llm.last_usage
-        print(
-            f"LLM: {usage['prompt_tokens']} prompt + {usage['completion_tokens']} completion = {usage['total_tokens']} total tokens ({usage['model']})"
-        )
 
 
 def main() -> None:
@@ -185,6 +200,8 @@ def main() -> None:
         cmd_ingest(config)
     elif args.command == "query":
         cmd_query(config, args.question)
+    elif args.command == "evaluate":
+        cmd_evaluate(config, args.dataset)
 
 
 if __name__ == "__main__":
