@@ -6,6 +6,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--config", default="config/default.yaml", help="Path to config YAML"
     )
+    parser.add_argument(
+        "--verbose", "-v", action="store_true", help="Enable debug logging"
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("ingest", help="Ingest documents into vector store")

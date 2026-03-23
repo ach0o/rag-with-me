@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from rag_agent.domain.models import Chunk, Document
@@ -11,6 +12,8 @@ from rag_agent.domain.ports import (
     ChunkRepository,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class LoadStage:
     def __init__(self, loaders: list[DocLoader]) -> None:
@@ -21,9 +24,9 @@ class LoadStage:
         for loader in self._loaders:
             loaded = loader.load()
             path = getattr(loader, "_path", "?")
-            print(f"  Loaded {len(loaded)} documents from {type(loader).__name__} ({path})")
+            logger.info(f"Loaded {len(loaded)} documents from {type(loader).__name__} ({path})")
             documents.extend(loaded)
-        print(f"  Total: {len(documents)} documents")
+        logger.info(f"Total: {len(documents)} documents")
         return documents
 
 
@@ -35,7 +38,7 @@ class ChunkStage:
         chunks: list[Chunk] = []
         for doc in data:
             chunks.extend(self._chunker.chunk(doc))
-        print(f"  Chunked into {len(chunks)} chunks")
+        logger.info(f"Chunked into {len(chunks)} chunks")
         return chunks
 
 
@@ -44,9 +47,9 @@ class EmbedStage:
         self._embedder = embedder
 
     def process(self, data: list[Chunk]) -> list[Chunk]:
+        logger.info(f"Embedding {len(data)} chunks...")
         texts = [chunk.content for chunk in data]
         embeddings = self._embedder.embed(texts)
-        print(f"  Embedding {len(data)} chunks...")
         result = [
             Chunk(
                 document_id=chunk.document_id,
@@ -57,7 +60,7 @@ class EmbedStage:
             )
             for chunk, embedding in zip(data, embeddings)
         ]
-        print(f"  Embedded {len(result)} chunks")
+        logger.info(f"Embedded {len(result)} chunks")
         return result
 
 
@@ -66,9 +69,9 @@ class StoreStage:
         self._vector_store = vector_store
 
     def process(self, data: list[Chunk]) -> list[Chunk]:
-        print(f"  Storing {len(data)} chunks in vector store...")
+        logger.info(f"Storing {len(data)} chunks in vector store...")
         self._vector_store.add(data)
-        print(f"  Stored {len(data)} chunks")
+        logger.debug(f"Stored {len(data)} chunks")
         return data
 
 
@@ -77,7 +80,7 @@ class PersistDocumentStage:
         self._document_repository = document_repository
 
     def process(self, data: list[Document]) -> list[Document]:
-        print(f"  Persisting {len(data)} documents to database...")
+        logger.info(f"Persisting {len(data)} documents to database...")
         self._document_repository.save(data)
         return data
 
@@ -87,7 +90,7 @@ class PersistChunkStage:
         self._chunk_repository = chunk_repository
 
     def process(self, data: list[Chunk]) -> list[Chunk]:
-        print(f"  Persisting {len(data)} chunks to database...")
+        logger.info(f"Persisting {len(data)} chunks to database...")
         self._chunk_repository.save(data)
         return data
 

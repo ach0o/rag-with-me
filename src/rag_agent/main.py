@@ -1,3 +1,4 @@
+import logging
 from typing import TYPE_CHECKING
 
 from dotenv import load_dotenv
@@ -30,8 +31,14 @@ from rag_agent.application.metrics import (
     SemanticSimilarityMetric,
 )
 from rag_agent.config import AppConfig
+from rag_agent.logging_config import setup_logging
+
+if TYPE_CHECKING:
+    from rag_agent.application import QueryUseCase
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 
 def build_loaders(config: AppConfig):
@@ -142,6 +149,7 @@ def build_query_executor(config: AppConfig) -> QueryGraphBuilder:
 
 
 def cmd_ingest(config: AppConfig) -> None:
+    logger.info("Starting ingestion...")
     embedder = build_embedder(config)
     loaders = build_loaders(config)
     chunker = build_chunker(config, embedder)
@@ -157,29 +165,31 @@ def cmd_ingest(config: AppConfig) -> None:
         chunk_repository=chunk_repo,
     )
     chunks = use_case.execute()
-    print(f"Ingested {len(chunks)} chunks")
+    logger.info(f"Ingested {len(chunks)} chunks")
 
     if embedder.last_usage:
         usage = embedder.last_usage
-        print(
+        logger.info(
             f"Embeddings: {usage['num_texts']} texts, dim={usage['embedding_dim']}, {usage['total_tokens']} tokens"
         )
 
 
 def cmd_query(config: AppConfig, question: str) -> None:
+    logger.info(f"Query: {question}")
     use_case = build_query_executor(config)
     result = use_case.execute(question)
 
-    print(f"\nAnswer: {result.answer}\n")
-    print("Sources:")
+    logger.info(f"\nAnswer: {result.answer}\n")
+    logger.info("Sources:")
     for chunk in result.chunks:
         source = chunk.metadata.get("source", "unknown")
-        print(f"  - {source}")
+        logger.info(f"  - {source}")
     if result.metadata.get("attempts", 0) > 0:
-        print(f"\nRetrieval attempts: {result.metadata['attempts'] + 1}")
+        logger.info(f"\nRetrieval attempts: {result.metadata['attempts'] + 1}")
 
 
 def cmd_evaluate(config: AppConfig, dataset_path: str) -> None:
+    logger.info(f"Starting evaluation with dataset: {dataset_path}")
     query_executor = build_query_executor(config)
     judge_llm = build_llm(config)
     embedder = build_embedder(config)
@@ -197,16 +207,17 @@ def cmd_evaluate(config: AppConfig, dataset_path: str) -> None:
     )
     summary = use_case.execute()
 
-    print(f"\n{'=' * 50}")
-    print(f"Evaluation Summary ({summary.total_questions} questions)")
-    print(f"{'=' * 50}")
+    logger.info(f"\n{'=' * 50}")
+    logger.info(f"Evaluation Summary ({summary.total_questions} questions)")
+    logger.info(f"{'=' * 50}")
     for name, score in summary.scores.items():
-        print(f"  {name}: {score:.2f}")
-    print()
+        logger.info(f"  {name}: {score:.2f}")
+    logger.info("")
 
 
 def main() -> None:
     args = parse_args()
+    setup_logging(verbose=args.verbose)
     config = AppConfig.from_yaml(args.config)
 
     if args.command == "ingest":

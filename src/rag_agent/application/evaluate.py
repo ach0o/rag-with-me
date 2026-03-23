@@ -1,10 +1,13 @@
 import json
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from rag_agent.application.query import QueryUseCase
 from rag_agent.application.query_graph import QueryGraphBuilder
 from rag_agent.domain.metrics import Metric
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -72,7 +75,7 @@ class EvaluateUseCase:
             result = self._evaluate_item(item)
             results.append(result)
             scores_str = " ".join(f"{k}={v:.2f}" for k, v in result.scores.items())
-            print(f"  [{i + 1}/{len(dataset)}] {scores_str} | {result.question[:50]}")
+            logger.info(f"[{i + 1}/{len(dataset)}] {scores_str} | {result.question[:50]}")
 
         summary_scores = {m.name: m.aggregate(results) for m in self._metrics}
 
