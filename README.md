@@ -190,6 +190,27 @@ database:
 
 Pydantic validates all config at startup — typos and invalid values are caught before any work begins.
 
+## Evaluation
+
+Run the evaluation suite against a gold Q&A dataset:
+
+```bash
+python -m rag_agent evaluate
+python -m rag_agent evaluate --dataset eval_data/custom.json
+```
+
+Metrics are pluggable strategy classes. Current metrics:
+
+| Category | Metric | Description |
+|----------|--------|-------------|
+| Retrieval | recall_at_k | Did the expected source appear in retrieved chunks? |
+| Retrieval | precision_at_k | What fraction of retrieved chunks are from the expected source? |
+| Retrieval | mrr | How high does the expected source rank? |
+| Answer | faithfulness | LLM-as-judge: does the answer match the expected answer? |
+| Answer | semantic_similarity | Cosine similarity between expected and actual answer embeddings |
+
+Adding a new metric = one class implementing `Metric` protocol (score_item + aggregate).
+
 ## Tech Stack
 
 | Layer | Choice |
@@ -210,5 +231,5 @@ Pydantic validates all config at startup — typos and invalid values are caught
 - [x] Phase 2 — Multiple adapters, PostgreSQL storage, rerankers, unit tests
 - [x] Phase 3 — LangGraph agent (grader + rephrase loop)
 - [x] Phase 4 — PDF loader, vision image description, multi-path ingestion, query expansion
-- [ ] Phase 5 — Evaluation & observability
+- [x] Phase 5 — Evaluation framework (pluggable metrics, gold Q&A dataset)
 - [ ] Phase 6 — Portfolio polish (demo UI, CI)

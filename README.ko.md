@@ -182,6 +182,27 @@ database:
 
 Pydantic이 시작 시 모든 설정을 검증합니다 — 오타나 잘못된 값은 실행 전에 바로 잡아냅니다.
 
+## 평가
+
+골드 Q&A 데이터셋으로 평가를 실행합니다:
+
+```bash
+python -m rag_agent evaluate
+python -m rag_agent evaluate --dataset eval_data/custom.json
+```
+
+메트릭은 플러거블 전략 클래스입니다. 현재 메트릭:
+
+| 카테고리 | 메트릭 | 설명 |
+|----------|--------|------|
+| 검색 | recall_at_k | 기대 소스가 검색된 청크에 포함되었는가? |
+| 검색 | precision_at_k | 검색된 청크 중 기대 소스 비율은? |
+| 검색 | mrr | 기대 소스의 순위는? |
+| 답변 | faithfulness | LLM 심판: 답변이 기대 답변과 일치하는가? |
+| 답변 | semantic_similarity | 기대 답변과 실제 답변 임베딩의 코사인 유사도 |
+
+새 메트릭 추가 = `Metric` 프로토콜을 구현하는 클래스 하나 (score_item + aggregate).
+
 ## 기술 스택
 
 | 레이어 | 선택 |
@@ -202,5 +223,5 @@ Pydantic이 시작 시 모든 설정을 검증합니다 — 오타나 잘못된 
 - [x] Phase 2 — 다양한 어댑터, PostgreSQL 저장소, 리랭커, 유닛 테스트
 - [x] Phase 3 — LangGraph 에이전트 (평가 + 재질의 루프)
 - [x] Phase 4 — PDF 로더, 비전 이미지 설명, 다중 경로 수집, 쿼리 확장
-- [ ] Phase 5 — 평가 및 관측성
+- [x] Phase 5 — 평가 프레임워크 (플러거블 메트릭, 골드 Q&A 데이터셋)
 - [ ] Phase 6 — 포트폴리오 마무리 (데모 UI, CI)
